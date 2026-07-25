@@ -4,9 +4,6 @@
 // @version      3.0.0-alpha.12
 // @description  Backend-connected Vault 111 OC planner with secure shared data and self-only crime-stat synchronization.
 // @author       Vault 111
-// @homepageURL  https://github.com/Zabok08/Vault-111
-// @downloadURL  https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
-// @updateURL    https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
 // @match        https://www.torn.com/*
 // @connect      vault111-control-center.onrender.com
 // @grant        GM_xmlhttpRequest

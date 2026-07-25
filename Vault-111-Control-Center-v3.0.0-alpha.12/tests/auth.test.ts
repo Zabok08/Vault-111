@@ -1,0 +1,45 @@
+import { beforeAll, describe, expect, it } from "vitest";
+
+beforeAll(() => {
+  process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
+  process.env.PUBLIC_BASE_URL = "http://127.0.0.1:3000";
+  process.env.VAULT111_FACTION_ID = "123";
+  process.env.JWT_ISSUER = "test";
+  process.env.JWT_AUDIENCE = "test";
+  process.env.JWT_SECRET = "12345678901234567890123456789012";
+  process.env.KEY_ENCRYPTION_ACTIVE_VERSION = "v1";
+  process.env.KEY_ENCRYPTION_KEYS_JSON = JSON.stringify({
+    v1: Buffer.alloc(32, 7).toString("base64")
+  });
+});
+
+describe("server-enforced permissions", () => {
+  it("allows Members to read but not synchronize", async () => {
+    const { requirePermission } = await import("../src/auth.js");
+    const member = {
+      id: "member",
+      tornId: 42,
+      factionId: 123,
+      role: "MEMBER",
+      isSuspended: false
+    } as const;
+
+    expect(() => requirePermission(member, "oc.read")).not.toThrow();
+    expect(() => requirePermission(member, "oc.sync")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
+  });
+
+  it("allows OC Planners to synchronize", async () => {
+    const { requirePermission } = await import("../src/auth.js");
+    const planner = {
+      id: "planner",
+      tornId: 43,
+      factionId: 123,
+      role: "OC_PLANNER",
+      isSuspended: false
+    } as const;
+
+    expect(() => requirePermission(planner, "oc.sync")).not.toThrow();
+  });
+});
