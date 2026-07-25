@@ -8,7 +8,6 @@ services:
     healthCheckPath: /health
     renderSubdomainPolicy: enabled
     autoDeployTrigger: commit
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: NODE_ENV
         value: production
