@@ -5,7 +5,8 @@
 // @description  Vault 111 OC planning and ranked-war tracking with secure shared backend data.
 // @author       Vault 111
 // @match        https://www.torn.com/*
-// @connect      vault111-control-center.onrender.com
+// @connect      127.0.0.1
+// @connect      localhost
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -25,7 +26,7 @@
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
-  const BACKEND_API = 'https://vault111-control-center.onrender.com';
+  const BACKEND_API = 'http://127.0.0.1:3000';
   const STORE = {
     cache: 'v111_ocp_cache_v1',
     settings: 'v111_ocp_settings_v1',
