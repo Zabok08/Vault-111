@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AppRole {
+  OWNER
+  ADMIN
+  OC_PLANNER
+  WAR_MANAGER
+  OFFICER
+  MEMBER
+}
+
+enum AssignmentSource {
+  OPTIMIZER
+  MANUAL
+  TORN
+}
+
+model User {
+  id                 String         @id @default(cuid())
+  tornId             Int            @unique
+  name               String
+  factionId          Int
+  factionPosition    String?
+  role               AppRole       @default(MEMBER)
+  isSuspended        Boolean        @default(false)
+  encryptedApiKey    String?
+  apiKeyFingerprint  String?
+  apiKeyUpdatedAt    DateTime?
+  lastVerifiedAt     DateTime
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  sessions           Session[]
+  assignments        OcAssignment[] @relation("AssignedMember")
+  assignmentChanges  OcAssignment[] @relation("ChangedBy")
+  auditEvents        AuditEvent[]
+
+  @@index([factionId, role])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedById     String?
+  userAgent        String?
+  ipHash           String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model OcCrime {
+  id            String         @id
+  factionId     Int
+  name          String
+  difficulty    Int            @default(0)
+  status        String
+  version       Int            @default(1)
+  tornPayload   Json
+  createdAtTorn DateTime?
+  planningAt    DateTime?
+  readyAt       DateTime?
+  expiredAt     DateTime?
+  executedAt    DateTime?
+  isActive      Boolean        @default(true)
+  lastSeenAt    DateTime        @default(now())
+  syncedAt      DateTime
+  assignments   OcAssignment[]
+
+  @@index([factionId, isActive, status])
+}
+
+model FactionMember {
+  factionId       Int
+  tornId          Int
+  name            String
+  position        String?
+  level           Int
+  daysInFaction   Int
+  isInOc          Boolean
+  status          String?
+  lastActionAt    DateTime?
+  tornPayload     Json
+  isActive        Boolean  @default(true)
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@id([factionId, tornId])
+  @@index([factionId, isActive, isInOc])
+}
+
+model FactionSyncState {
+  factionId       Int       @id
+  lastAttemptAt   DateTime?
+  lastSuccessAt   DateTime?
+  inProgressAt    DateTime?
+  syncedByTornId  Int?
+  memberCount     Int       @default(0)
+  crimeCount      Int       @default(0)
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model MemberCrimeStats {
+  factionId Int
+  tornId    Int
+  stats     Json
+  totals    Json
+  syncedAt  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([factionId, tornId])
+  @@index([factionId, syncedAt])
+}
+
+model OcAssignment {
+  id               String           @id @default(cuid())
+  crimeId          String
+  roleKey          String
+  assignedTornId   Int?
+  assignedUserId   String?
+  locked           Boolean          @default(false)
+  source           AssignmentSource @default(MANUAL)
+  expectedVersion  Int
+  changedByUserId  String
+  note             String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  crime            OcCrime          @relation(fields: [crimeId], references: [id], onDelete: Cascade)
+  assignedUser     User?            @relation("AssignedMember", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  changedBy        User             @relation("ChangedBy", fields: [changedByUserId], references: [id])
+
+  @@unique([crimeId, roleKey])
+  @@index([assignedTornId])
+}
+
+model RoleMapping {
+  id              String   @id @default(cuid())
+  factionId       Int
+  factionPosition String
+  appRole         AppRole
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([factionId, factionPosition])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  resource    String
+  resourceId  String?
+  requestId   String?
+  ipHash      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+}
