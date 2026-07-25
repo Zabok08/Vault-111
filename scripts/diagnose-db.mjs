@@ -1,5 +1,4 @@
 import { loadEnvFile } from "node:process";
-import { PrismaClient } from "@prisma/client";
 
 const envFile = process.argv.slice(2).find(value => value.startsWith("--env-file="))?.slice("--env-file=".length) || ".env";
 try {
@@ -8,6 +7,8 @@ try {
   if (error?.code !== "ENOENT") throw error;
 }
 
+// Import Prisma only after the requested environment file has been loaded.
+const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 try {
   const [users, sessions, roleMappings, factionMembers, activeCrimes, roles, migrations] = await Promise.all([

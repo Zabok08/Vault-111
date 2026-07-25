@@ -1,5 +1,4 @@
 import { loadEnvFile } from "node:process";
-import { PrismaClient } from "@prisma/client";
 
 const argumentsList = process.argv.slice(2);
 const envFile = argumentsList.find(value => value.startsWith("--env-file="))?.slice("--env-file=".length) || ".env";
@@ -21,6 +20,8 @@ if (!Number.isSafeInteger(factionId) || factionId <= 0 || !factionPosition || !a
   );
 }
 
+// Import Prisma only after the requested environment file has been loaded.
+const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 try {
   const positionExists = await prisma.factionMember.findFirst({

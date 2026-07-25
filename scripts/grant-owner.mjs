@@ -1,5 +1,4 @@
 import { loadEnvFile } from "node:process";
-import { PrismaClient } from "@prisma/client";
 
 const argumentsList = process.argv.slice(2);
 const envFile = argumentsList.find(value => value.startsWith("--env-file="))?.slice("--env-file=".length) || ".env";
@@ -14,6 +13,10 @@ if (!Number.isSafeInteger(tornId) || tornId <= 0) {
   throw new Error("Usage: npm run owner:grant -- YOUR_NUMERIC_TORN_ID [--env-file=.env.production]");
 }
 
+// Prisma reads its datasource configuration during module initialization.
+// Load the selected environment file first so production helpers cannot
+// accidentally connect to a local database.
+const { PrismaClient } = await import("@prisma/client");
 const prisma = new PrismaClient();
 try {
   const user = await prisma.user.findUnique({
