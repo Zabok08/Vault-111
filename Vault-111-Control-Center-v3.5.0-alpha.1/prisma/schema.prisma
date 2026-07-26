@@ -1,0 +1,468 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AppRole {
+  OWNER
+  ADMIN
+  OC_PLANNER
+  WAR_MANAGER
+  OFFICER
+  MEMBER
+}
+
+enum AssignmentSource {
+  OPTIMIZER
+  MANUAL
+  TORN
+}
+
+enum WarPayoutStatus {
+  DRAFT
+  FINALIZED
+}
+
+enum ScheduleEventType {
+  CHAIN
+  RANKED_WAR
+  OC
+  FACTION
+  MEETING
+  OTHER
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  tornId                 Int                     @unique
+  name                   String
+  factionId              Int
+  factionPosition        String?
+  role                   AppRole                 @default(MEMBER)
+  isSuspended            Boolean                 @default(false)
+  encryptedApiKey        String?
+  apiKeyFingerprint      String?
+  apiKeyUpdatedAt        DateTime?
+  analyticsConsentAt     DateTime?
+  lastVerifiedAt         DateTime
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  sessions               Session[]
+  assignments            OcAssignment[]          @relation("AssignedMember")
+  assignmentChanges      OcAssignment[]          @relation("ChangedBy")
+  warTargetNotes         WarTarget[]             @relation("WarTargetNoteAuthor")
+  payoutPlansUpdated     WarPayoutPlan[]         @relation("WarPayoutUpdatedBy")
+  payoutPlansFinalized   WarPayoutPlan[]         @relation("WarPayoutFinalizedBy")
+  payoutAdjustments      WarPayoutAdjustment[]   @relation("WarPayoutAdjustmentUpdatedBy")
+  announcementsCreated   Announcement[]          @relation("AnnouncementCreatedBy")
+  announcementsUpdated   Announcement[]          @relation("AnnouncementUpdatedBy")
+  scheduleEventsCreated  ScheduleEvent[]         @relation("ScheduleEventCreatedBy")
+  scheduleEventsUpdated  ScheduleEvent[]         @relation("ScheduleEventUpdatedBy")
+  notificationPreference NotificationPreference?
+  auditEvents            AuditEvent[]
+
+  @@index([factionId, role])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedById     String?
+  userAgent        String?
+  ipHash           String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model OcCrime {
+  id            String         @id
+  factionId     Int
+  name          String
+  difficulty    Int            @default(0)
+  status        String
+  version       Int            @default(1)
+  tornPayload   Json
+  createdAtTorn DateTime?
+  planningAt    DateTime?
+  readyAt       DateTime?
+  expiredAt     DateTime?
+  executedAt    DateTime?
+  isActive      Boolean        @default(true)
+  lastSeenAt    DateTime       @default(now())
+  syncedAt      DateTime
+  assignments   OcAssignment[]
+
+  @@index([factionId, isActive, status])
+}
+
+model FactionMember {
+  factionId     Int
+  tornId        Int
+  name          String
+  position      String?
+  level         Int
+  daysInFaction Int
+  isInOc        Boolean
+  status        String?
+  lastActionAt  DateTime?
+  tornPayload   Json
+  isActive      Boolean   @default(true)
+  lastSeenAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@id([factionId, tornId])
+  @@index([factionId, isActive, isInOc])
+}
+
+model FactionSyncState {
+  factionId      Int       @id
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  inProgressAt   DateTime?
+  syncedByTornId Int?
+  memberCount    Int       @default(0)
+  crimeCount     Int       @default(0)
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model RankedWar {
+  id                Int            @id
+  factionId         Int
+  factionName       String
+  opponentFactionId Int
+  opponentName      String
+  startsAt          DateTime
+  endsAt            DateTime?
+  targetScore       Int
+  factionScore      Int
+  opponentScore     Int
+  factionChain      Int
+  opponentChain     Int
+  winnerFactionId   Int?
+  status            String
+  lastSeenAt        DateTime       @default(now())
+  syncedAt          DateTime
+  attacks           WarAttack[]
+  targets           WarTarget[]
+  payoutPlan        WarPayoutPlan?
+
+  @@index([factionId, status, startsAt])
+}
+
+model WarAttack {
+  id                String    @id
+  rankedWarId       Int
+  startedAt         DateTime
+  endedAt           DateTime
+  attackerTornId    Int?
+  attackerName      String?
+  attackerFactionId Int?
+  defenderTornId    Int
+  defenderName      String
+  defenderFactionId Int?
+  result            String
+  respectGain       Float
+  respectLoss       Float
+  chain             Int?
+  isInterrupted     Boolean
+  isRankedWar       Boolean   @default(false)
+  syncedAt          DateTime
+  war               RankedWar @relation(fields: [rankedWarId], references: [id], onDelete: Cascade)
+
+  @@index([rankedWarId, endedAt])
+  @@index([rankedWarId, attackerTornId])
+}
+
+model WarTarget {
+  rankedWarId       Int
+  tornId            Int
+  name              String
+  level             Int
+  position          String?
+  statusState       String?
+  statusDescription String?
+  statusUntil       DateTime?
+  lastActionAt      DateTime?
+  isRevivable       Boolean
+  isActive          Boolean   @default(true)
+  lastSeenAt        DateTime  @default(now())
+  syncedAt          DateTime
+  note              String?
+  noteVersion       Int       @default(1)
+  noteUpdatedAt     DateTime?
+  noteUpdatedById   String?
+  war               RankedWar @relation(fields: [rankedWarId], references: [id], onDelete: Cascade)
+  noteUpdatedBy     User?     @relation("WarTargetNoteAuthor", fields: [noteUpdatedById], references: [id], onDelete: SetNull)
+
+  @@id([rankedWarId, tornId])
+  @@index([rankedWarId, isActive, statusState])
+}
+
+model WarSyncState {
+  factionId      Int       @id
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  inProgressAt   DateTime?
+  syncedByTornId Int?
+  rankedWarId    Int?
+  attackCount    Int       @default(0)
+  targetCount    Int       @default(0)
+  isTruncated    Boolean   @default(false)
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model WarPayoutPlan {
+  id                String                @id @default(cuid())
+  rankedWarId       Int                   @unique
+  factionId         Int
+  poolAmount        BigInt                @default(0)
+  status            WarPayoutStatus       @default(DRAFT)
+  version           Int                   @default(1)
+  updatedByUserId   String
+  finalizedAt       DateTime?
+  finalizedByUserId String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  war               RankedWar             @relation(fields: [rankedWarId], references: [id], onDelete: Cascade)
+  updatedBy         User                  @relation("WarPayoutUpdatedBy", fields: [updatedByUserId], references: [id])
+  finalizedBy       User?                 @relation("WarPayoutFinalizedBy", fields: [finalizedByUserId], references: [id], onDelete: SetNull)
+  adjustments       WarPayoutAdjustment[]
+  entries           WarPayoutEntry[]
+
+  @@index([factionId, status])
+}
+
+model WarPayoutAdjustment {
+  id              String        @id @default(cuid())
+  planId          String
+  tornId          Int
+  amount          BigInt        @default(0)
+  note            String?
+  updatedByUserId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  plan            WarPayoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  updatedBy       User          @relation("WarPayoutAdjustmentUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@unique([planId, tornId])
+  @@index([tornId])
+}
+
+model WarPayoutEntry {
+  planId           String
+  tornId           Int
+  name             String
+  position         String?
+  warHits          Int
+  chainHits        Int
+  outsideChainHits Int
+  points           Float
+  share            Float
+  baseAmount       BigInt
+  adjustmentAmount BigInt
+  finalAmount      BigInt
+  adjustmentNote   String?
+  createdAt        DateTime      @default(now())
+  plan             WarPayoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@id([planId, tornId])
+  @@index([planId, finalAmount])
+}
+
+model MemberCrimeStats {
+  factionId Int
+  tornId    Int
+  stats     Json
+  totals    Json
+  syncedAt  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([factionId, tornId])
+  @@index([factionId, syncedAt])
+}
+
+model MemberAnalytics {
+  factionId           Int
+  tornId              Int
+  strength            Decimal?  @db.Decimal(30, 0)
+  defense             Decimal?  @db.Decimal(30, 0)
+  speed               Decimal?  @db.Decimal(30, 0)
+  dexterity           Decimal?  @db.Decimal(30, 0)
+  battleTotal         Decimal?  @db.Decimal(30, 0)
+  cannabis            Int?
+  ecstasy             Int?
+  ketamine            Int?
+  lsd                 Int?
+  opium               Int?
+  pcp                 Int?
+  shrooms             Int?
+  speedDrug           Int?
+  vicodin             Int?
+  xanax               Int?
+  drugTotal           Int?
+  overdoses           Int?
+  rehabilitationCount Int?
+  rehabilitationFees  BigInt?
+  drugCooldownSeconds Int?
+  battleSyncedAt      DateTime?
+  drugsSyncedAt       DateTime?
+  cooldownSyncedAt    DateTime?
+  previousBattleTotal Decimal?  @db.Decimal(30, 0)
+  previousDrugTotal   Int?
+  previousXanax       Int?
+  previousSyncedAt    DateTime?
+  syncedAt            DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@id([factionId, tornId])
+  @@index([factionId, syncedAt])
+}
+
+model MemberAnalyticsSnapshot {
+  id                  String   @id @default(cuid())
+  factionId           Int
+  tornId              Int
+  bucketAt            DateTime
+  capturedAt          DateTime
+  strength            Decimal? @db.Decimal(30, 0)
+  defense             Decimal? @db.Decimal(30, 0)
+  speed               Decimal? @db.Decimal(30, 0)
+  dexterity           Decimal? @db.Decimal(30, 0)
+  battleTotal         Decimal? @db.Decimal(30, 0)
+  cannabis            Int?
+  ecstasy             Int?
+  ketamine            Int?
+  lsd                 Int?
+  opium               Int?
+  pcp                 Int?
+  shrooms             Int?
+  speedDrug           Int?
+  vicodin             Int?
+  xanax               Int?
+  drugTotal           Int?
+  overdoses           Int?
+  rehabilitationCount Int?
+  rehabilitationFees  BigInt?
+  drugCooldownSeconds Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([factionId, tornId, bucketAt])
+  @@index([factionId, tornId, capturedAt])
+}
+
+model OcAssignment {
+  id              String           @id @default(cuid())
+  crimeId         String
+  roleKey         String
+  assignedTornId  Int?
+  assignedUserId  String?
+  locked          Boolean          @default(false)
+  source          AssignmentSource @default(MANUAL)
+  expectedVersion Int
+  changedByUserId String
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  crime           OcCrime          @relation(fields: [crimeId], references: [id], onDelete: Cascade)
+  assignedUser    User?            @relation("AssignedMember", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  changedBy       User             @relation("ChangedBy", fields: [changedByUserId], references: [id])
+
+  @@unique([crimeId, roleKey])
+  @@index([assignedTornId])
+}
+
+model RoleMapping {
+  id              String   @id @default(cuid())
+  factionId       Int
+  factionPosition String
+  appRole         AppRole
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([factionId, factionPosition])
+}
+
+model Announcement {
+  id              String    @id @default(cuid())
+  factionId       Int
+  title           String
+  body            String
+  pinned          Boolean   @default(false)
+  expiresAt       DateTime?
+  version         Int       @default(1)
+  createdByUserId String
+  updatedByUserId String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       User      @relation("AnnouncementCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy       User      @relation("AnnouncementUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@index([factionId, pinned, createdAt])
+  @@index([factionId, expiresAt])
+}
+
+model ScheduleEvent {
+  id              String            @id @default(cuid())
+  factionId       Int
+  type            ScheduleEventType
+  title           String
+  description     String?
+  startsAt        DateTime
+  endsAt          DateTime?
+  version         Int               @default(1)
+  createdByUserId String
+  updatedByUserId String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       User              @relation("ScheduleEventCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy       User              @relation("ScheduleEventUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@index([factionId, startsAt])
+  @@index([factionId, type, startsAt])
+}
+
+model NotificationPreference {
+  userId               String              @id
+  enabled              Boolean             @default(true)
+  browserNotifications Boolean             @default(false)
+  eventTypes           ScheduleEventType[] @default([CHAIN, RANKED_WAR, OC, FACTION, MEETING, OTHER])
+  reminderMinutes      Int[]               @default([60, 15])
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  resource    String
+  resourceId  String?
+  requestId   String?
+  ipHash      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+}
