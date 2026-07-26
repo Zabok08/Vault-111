@@ -56,3 +56,14 @@ Exit criteria: members still install one `.user.js`; backend outages do not brea
 - Add scheduled rate-budgeted refresh and payout configuration only after manual sync has proven reliable.
 
 Exit criteria: exact ranked-war filtering, reliable score and attack ingestion, no duplicate attacks, readable stale/truncated state, and consistent `403` responses for unauthorized sync requests.
+
+## Phase 3.3 — member overview and analytics
+
+- Add explicit per-member consent and self-only synchronization for battle stats, drug totals, and cooldowns. (Implemented.)
+- Store normalized current values plus six-hour snapshots rather than Torn log data. (Implemented.)
+- Restrict exact analytics to the member, Owner, and Administrator on the backend. (Implemented.)
+- Audit privileged analytics reads and consent changes. (Implemented.)
+- Add searchable status, availability, last-action, battle-stat, drug, cooldown, and growth views to the Members tab. (Implemented.)
+- Delete current analytics and history when consent is withdrawn. (Implemented.)
+
+Exit criteria: no cross-member sync target, no exact private data for unauthorized roles, bounded history growth, successful migration, accessible mobile UI, and verified deletion on consent withdrawal.

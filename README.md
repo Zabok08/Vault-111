@@ -1,4 +1,4 @@
-# Vault 111 Control Center — Version 3.2 alpha.1
+# Vault 111 Control Center — Version 3.3 alpha.1
 
 This is a production-minded backend scaffold plus a minimal Tampermonkey connection layer. It does not replace the Version 2 planner: the planner remains the UI and local optimizer.
 
@@ -35,6 +35,11 @@ This is a production-minded backend scaffold plus a minimal Tampermonkey connect
 - Finalized payout snapshots that remain locked even if later Torn synchronization changes the attack history
 - Owner/Admin/War Manager payout editing, read-only faction-member reports, Admin/Owner reopening, CSV downloads, and audit events
 - Responsive payout rows that keep base and final amounts visible, plus a direct link to Torn's faction payout controls
+- Opt-in member battle-stat, per-drug, overdose, rehabilitation, and drug-cooldown synchronization
+- Six-hour analytics snapshots with previous-sync, 24-hour, 7-day, and 30-day growth calculations
+- Exact analytics visible only to the member, Owner, and Administrators; privileged reads and consent changes are audited
+- Searchable Member Overview with faction status, last action, OC availability, privacy-aware profiles, and mobile layouts
+- One-click consent withdrawal that deletes the member's stored analytics and history
 
 ## Local setup
 
@@ -66,7 +71,7 @@ Requirements: Node.js 22+, Docker Desktop (or PostgreSQL 15+), and Tampermonkey.
    ```
 
 6. Confirm `http://127.0.0.1:3000/health`.
-7. Install `client/Vault-111-Control-Center-v3.2.0-alpha.1.user.js` in Tampermonkey.
+7. Install `client/Vault-111-Control-Center-v3.3.0-alpha.1.user.js` in Tampermonkey.
 
 ## First shared synchronization
 
@@ -74,7 +79,7 @@ The Owner, Administrator, or OC Planner must connect with a Torn key that has mi
 
 The backend re-verifies the key owner and faction, synchronizes faction members and Recruiting/Planning crimes in one database transaction, and never returns the API key. Regular Members can refresh and read the resulting shared snapshot but cannot start a Torn synchronization.
 
-Every member can use **Sync My Crime Stats**. That endpoint decrypts only the authenticated member's own stored key, re-verifies that same Torn ID and faction, requests Torn's `personalstats` crime category, and publishes only normalized crime totals to the shared planner. It cannot use one member's session to update another member.
+Every member can use **Sync My Stats**. Crime-category synchronization remains self-only and publishes only normalized planner totals. Members who explicitly accept the analytics notice can additionally synchronize their own `battlestats`, drug-category `personalstats`, and current cooldown. Exact analytics are returned only to that member, the Owner, and Administrators. Withdrawing consent deletes the current analytics record and its stored history.
 
 For a local command-line check using the already encrypted Owner key:
 
@@ -112,8 +117,11 @@ Unmapped positions remain read-only Members. The `OWNER` role cannot be granted 
 | POST | `/v1/auth/refresh` | Valid refresh token |
 | POST | `/v1/auth/logout` | Refresh token |
 | GET | `/v1/me` | Authenticated |
+| PUT | `/v1/me/analytics-consent` | Authenticated; self only |
+| POST | `/v1/me/analytics/sync` | Authenticated; self only and consent required |
 | POST | `/v1/me/crime-stats/sync` | Authenticated; self only |
 | GET | `/v1/me/crime-stats` | Authenticated; self only |
+| GET | `/v1/members/overview` | `members.read`; exact analytics additionally require self or `members.analytics.read_all` |
 | POST | `/v1/faction/sync` | `oc.sync` |
 | GET | `/v1/faction/members` | `oc.read` |
 | GET | `/v1/oc/snapshot` | `oc.read` |
@@ -146,6 +154,6 @@ See `DEPLOY_RENDER_NEON.md` for the recommended free pilot and `DEPLOYMENT.md` f
 
 ## Important current limits
 
-This alpha synchronizes faction membership, currently available Recruiting/Planning crimes, the current or most recent ranked war, the current/scheduled opponent roster, outgoing ranked-war attacks, and each consenting connected member's own Torn crime-category stats. Members must connect and sync individually; the backend does not impersonate members or bulk-collect private data through another member's key. It does not yet schedule unattended syncs, run the optimizer server-side, expose role-management UI, provide real-time updates, or transfer money inside Torn. Payout reports calculate and export amounts only; officers still perform actual faction payments manually. The Version 2 optimizer still runs inside Tampermonkey using the shared normalized stats.
+This alpha synchronizes faction membership, currently available Recruiting/Planning crimes, the current or most recent ranked war, the current/scheduled opponent roster, outgoing ranked-war attacks, and each connected member's own approved statistics. Battle and drug analytics require explicit consent and a key with the required selections. Members must connect and sync individually; the backend does not impersonate members or bulk-collect private data through another member's key. It does not yet schedule unattended syncs, run the optimizer server-side, expose role-management UI, provide real-time updates, or transfer money inside Torn. Payout reports calculate and export amounts only; officers still perform actual faction payments manually. The Version 2 optimizer still runs inside Tampermonkey using the shared normalized crime stats.
 
 The Version 3 userscript preserves the planner and optimizer while using the backend as its only Torn-data and credential path. The obsolete Keys tab, local multi-key storage, direct client-to-Torn API calls, and pre-release fictional-data mode have been removed. See `client/INTEGRATION.md` for the merged behavior and production-host configuration.

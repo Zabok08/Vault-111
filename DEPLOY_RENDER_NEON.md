@@ -103,7 +103,7 @@ https://vault111-control-center.onrender.com/health
 Continue only when it reports:
 
 ```json
-{"ok":true,"version":"3.2.0-alpha.1","database":"connected"}
+{"ok":true,"version":"3.3.0-alpha.1","database":"connected"}
 ```
 
 The first visit after inactivity can take about one minute on the free service.
@@ -119,7 +119,7 @@ npm run client:configure -- https://vault111-control-center.onrender.com
 Replace the example address with the one Render assigned. This creates:
 
 ```text
-client/Vault-111-Control-Center-v3.2.0-alpha.1-production.user.js
+client/Vault-111-Control-Center-v3.3.0-alpha.1-production.user.js
 ```
 
 The generated file contains only the public HTTPS backend address and its exact Tampermonkey `@connect` hostname. It contains no server secret or Torn API key.
@@ -156,7 +156,9 @@ Allowed mappings are `ADMIN`, `OC_PLANNER`, `WAR_MANAGER`, `OFFICER`, and `MEMBE
 
 - Owner can connect, sync faction data, and save a shared assignment.
 - A regular Member can read the planner but receives `403` for protected writes.
-- Each pilot member connects only their own key and uses **Sync My Crime Stats**.
+- Each pilot member connects only their own key, reviews the analytics consent notice, and uses **Sync My Stats**.
+- A Member sees only their own exact analytics; Owner/Admin can see opted-in analytics; other roles receive private placeholders.
+- Disabling analytics deletes that member's current analytics and history.
 - Owner, Admin, or War Manager can use **Sync Ranked War**; Members can refresh and read the resulting shared tracker.
 - Owner, Admin, War Manager, or Officer can save target notes; regular Members can read them.
 - The userscript shows a wake message after the free service has been idle.

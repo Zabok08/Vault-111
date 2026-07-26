@@ -18,7 +18,9 @@ Access tokens are short-lived signed JWTs. Refresh tokens are 256-bit random val
 
 Permissions are mapped from backend roles and reloaded from the database on every authenticated request. Membership is checked at login and re-verified before every privileged Torn synchronization. Writes validate the faction ownership of every affected record and create audit events.
 
-The shared ingestion snapshot stores only planning fields: member identity, faction position, level, OC occupancy, coarse Torn status/last-action data, available crime/slot data, and normalized crime-category stats explicitly synchronized by each member. The self-stat endpoint derives the Torn ID from the authenticated session, re-verifies the encrypted key owner, and cannot accept a target member ID. Unrelated personal-stat categories are not requested or retained. Empty-slot checkpoint rates are key-owner-specific and are deliberately not published as shared recommendations.
+The shared ingestion snapshot stores only planning fields: member identity, faction position, level, OC occupancy, coarse Torn status/last-action data, available crime/slot data, and normalized crime-category stats explicitly synchronized by each member. The self-stat endpoints derive the Torn ID from the authenticated session, re-verify the encrypted key owner, and cannot accept a target member ID. Empty-slot checkpoint rates are key-owner-specific and are deliberately not published as shared recommendations.
+
+Member analytics require explicit consent. The service requests only `user:battlestats`, the drugs category from `user:personalstats`, and `user:cooldowns`. It retains normalized battle values, named-drug totals, overdoses, rehabilitation totals, the current drug cooldown, and six-hour growth snapshots. Exact analytics are returned only to that member or a backend-authorized Owner/Administrator. Privileged overview reads and consent changes create audit events. Withdrawing consent deletes the current record and all stored snapshots for that member.
 
 ## Threats still requiring work
 

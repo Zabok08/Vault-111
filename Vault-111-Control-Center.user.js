@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.2.0-alpha.2
-// @description  Vault 111 OC planning, ranked-war tracking, target notes, and secure shared payout reports.
+// @version      3.3.0-alpha.1
+// @description  Vault 111 OC planning, war tracking, payouts, and privacy-aware member analytics.
 // @author       Vault 111
 // @match        https://www.torn.com/*
 // @connect      vault111-control-center.onrender.com
@@ -21,7 +21,7 @@
   if (document.getElementById(INSTANCE_MARKER_ID)) return;
   const instanceMarker = document.createElement('meta');
   instanceMarker.id = INSTANCE_MARKER_ID;
-  instanceMarker.dataset.version = '3.2.0-alpha.2';
+  instanceMarker.dataset.version = '3.3.0-alpha.1';
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
@@ -53,6 +53,7 @@
       user: null,
       error: '',
       sync: null,
+      memberOverview: null,
       warSnapshot: null,
       payoutSnapshot: null,
       assignments: new Map(),
@@ -62,10 +63,12 @@
       activeTab: 'dashboard',
       scrollByTab: {},
       memberSearch: '',
+      memberFilter: 'all',
       warTargetSearch: '',
       warTargetFilter: 'all',
       dashboardStatus: null,
       plannerStatus: null,
+      memberStatus: null,
       warStatus: null,
       payoutStatus: null,
       backendStatus: null,
@@ -143,6 +146,7 @@
     const paneAttributes = tab => `id="v111-pane-${tab}" role="tabpanel" aria-labelledby="v111-tab-${tab}" tabindex="0"${isActive(tab) ? '' : ' hidden'}`;
     const { members = [], crimes = [], syncedAt = 0 } = state.cache;
     const plans = buildPlan(members, crimes);
+    const directoryMembers = mergeMemberOverview(members);
     const metrics = getDashboardMetrics(plans, members);
     root.classList.toggle('collapsed', !!state.settings.collapsed);
     root.classList.toggle('compact', !!state.settings.compact);
@@ -152,7 +156,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.2 alpha.1 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.3 alpha.1 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
@@ -198,12 +202,25 @@
             <div class="plans">${renderPlans(plans)}</div>
           </section>
           <section data-pane="members" ${paneAttributes('members')}>
+            ${renderMemberSummary(directoryMembers)}
             <div class="member-tools">
               <label class="sr-only" for="v111-member-search">Search faction members</label>
               <input id="v111-member-search" type="search" value="${esc(state.ui.memberSearch)}" placeholder="Search faction members" aria-controls="v111-member-list">
-              <span>${members.filter(m => m.apiStatus === 'ok').length} members with synced stats</span>
+              <label>Show
+                <select id="v111-member-filter">
+                  <option value="all" ${state.ui.memberFilter === 'all' ? 'selected' : ''}>All members</option>
+                  <option value="analytics" ${state.ui.memberFilter === 'analytics' ? 'selected' : ''}>Analytics shared</option>
+                  <option value="available" ${state.ui.memberFilter === 'available' ? 'selected' : ''}>Available</option>
+                  <option value="hospital" ${state.ui.memberFilter === 'hospital' ? 'selected' : ''}>Hospitalized</option>
+                  <option value="travel" ${state.ui.memberFilter === 'travel' ? 'selected' : ''}>Traveling</option>
+                  <option value="inactive" ${state.ui.memberFilter === 'inactive' ? 'selected' : ''}>Inactive</option>
+                </select>
+              </label>
+              <button class="primary" data-act="member-refresh"${busyAttributes()}>Refresh Overview</button>
+              ${state.backend.user?.analyticsConsentAt ? `<button data-act="member-sync-self"${busyAttributes()}>Sync My Analytics</button>` : ''}
             </div>
-            <div class="member-list" id="v111-member-list">${renderMemberList(members, plans)}</div>
+            ${renderStatusRegion('v111-member-status', state.ui.memberStatus)}
+            <div class="member-list" id="v111-member-list">${renderMemberList(directoryMembers, plans)}</div>
           </section>
           <section data-pane="war" ${paneAttributes('war')}>
             ${renderWarPanel()}
@@ -336,6 +353,104 @@
     </div>`;
   }
 
+  function mergeMemberOverview(members) {
+    const baseById = new Map(members.map(member => [Number(member.id), member]));
+    const overviewById = new Map(
+      (state.backend.memberOverview?.members || []).map(member => [Number(member.id), member])
+    );
+    const ids = new Set([...baseById.keys(), ...overviewById.keys()]);
+    return [...ids].map(id => {
+      const base = baseById.get(id) || {};
+      return {
+        ...base,
+        ...(overviewById.get(id) || {}),
+        id,
+        stats: base.stats || {},
+        totals: base.totals || {},
+        apiStatus: base.apiStatus || 'not_registered'
+      };
+    });
+  }
+
+  function memberStatusGroup(member) {
+    const status = String(member.status || '').toLowerCase();
+    if (/hospital/.test(status)) return 'hospital';
+    if (/travel|abroad/.test(status)) return 'travel';
+    const lastAction = timestampMs(member.lastActionAt);
+    if (lastAction && Date.now() - lastAction > 3 * 24 * 60 * 60 * 1000) return 'inactive';
+    return member.isInOc ? 'occupied' : 'available';
+  }
+
+  function renderMemberSummary(members) {
+    const summary = state.backend.memberOverview?.summary;
+    const values = summary || {
+      members: members.length,
+      connected: 0,
+      analyticsShared: 0,
+      inOc: members.filter(member => member.isInOc).length,
+      hospitalized: members.filter(member => memberStatusGroup(member) === 'hospital').length,
+      traveling: members.filter(member => memberStatusGroup(member) === 'travel').length
+    };
+    return `<div class="member-summary" aria-label="Faction member overview">
+      <div><b>${formatNumber(values.members)}</b><span>Members</span></div>
+      <div><b>${formatNumber(values.analyticsShared)}</b><span>Analytics shared</span></div>
+      <div><b>${formatNumber(values.inOc)}</b><span>In an OC</span></div>
+      <div><b>${formatNumber(Number(values.hospitalized || 0) + Number(values.traveling || 0))}</b><span>Hospital / travel</span></div>
+    </div>
+    <p class="member-privacy">${state.backend.memberOverview?.privacy?.canReadAllAnalytics
+      ? 'Administrator view: exact opt-in analytics are visible.'
+      : 'Exact battle and drug analytics are visible only to you, the Vault 111 Owner, and Administrators.'}</p>`;
+  }
+
+  function formatLargeInteger(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    try {
+      return BigInt(String(value)).toLocaleString();
+    } catch {
+      return formatNumber(value);
+    }
+  }
+
+  function formatRelativeDate(value) {
+    const time = timestampMs(value);
+    if (!time) return 'Unknown';
+    const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
+    if (seconds < 60) return 'Now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function formatCooldown(seconds) {
+    const value = Math.max(0, Number(seconds || 0));
+    if (!value) return 'Ready';
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.ceil((value % 3600) / 60);
+    return `${hours ? `${hours}h ` : ''}${minutes}m`;
+  }
+
+  function formatGain(value) {
+    if (value === null || value === undefined) return '—';
+    const text = String(value);
+    return `${text.startsWith('-') || text === '0' ? '' : '+'}${formatLargeInteger(text)}`;
+  }
+
+  function renderAnalyticsGains(analytics) {
+    const periods = [
+      ['Previous sync', analytics?.gains?.previous],
+      ['24 hours', analytics?.gains?.day],
+      ['7 days', analytics?.gains?.week],
+      ['30 days', analytics?.gains?.month]
+    ];
+    return `<div class="analytics-trends">${periods.map(([label, gain]) => `
+      <div>
+        <b>${label}</b>
+        <span>Battle ${formatGain(gain?.battleTotal)}</span>
+        <span>Drugs ${formatGain(gain?.drugTotal)}</span>
+        <span>Xanax ${formatGain(gain?.xanax)}</span>
+      </div>`).join('')}</div>`;
+  }
+
   function renderMemberList(members, plans) {
     const assignments = new Map();
     plans.forEach(c => c.slots.forEach(s => {
@@ -349,9 +464,17 @@
     return ordered.map(member => {
       const best = bestRolesForMember(member, plans).slice(0,3);
       const assignment = assignments.get(Number(member.id));
-      return `<button class="member-row" data-member-id="${member.id}" data-member-name="${esc(String(member.name).toLowerCase())}" aria-haspopup="dialog">
-        <span><b>${esc(member.name)} [${member.id}]</b><small>${member.position || 'Member'} · ${member.apiStatus === 'ok' ? 'Stats loaded' : 'No stats synced'}${member.isInOc ? ' · In OC' : ''}</small></span>
-        <span class="member-tags">${assignment ? `<i>${esc(assignment.role)}</i>` : best.map(x => `<i>${esc(x.role)}</i>`).join('')}</span>
+      const group = memberStatusGroup(member);
+      const analyticsShared = ['exact', 'private'].includes(member.analyticsAccess);
+      const analytics = member.analytics;
+      return `<button class="member-row" data-member-id="${member.id}" data-member-name="${esc(String(member.name).toLowerCase())}" data-member-status="${group}" data-member-analytics="${analyticsShared}" aria-haspopup="dialog">
+        <span class="member-identity"><b>${esc(member.name)} [${member.id}]</b><small>${esc(member.position || 'Member')} · ${esc(member.status || 'Status unknown')} · ${formatRelativeDate(member.lastActionAt)}</small></span>
+        <span class="member-tags">
+          ${analytics?.battle?.total ? `<i class="analytics-tag">BS ${formatLargeInteger(analytics.battle.total)}</i>` : ''}
+          ${analytics?.drugs?.xanax !== null && analytics?.drugs?.xanax !== undefined ? `<i class="analytics-tag">Xanax ${formatNumber(analytics.drugs.xanax)}</i>` : ''}
+          ${member.analyticsAccess === 'private' ? '<i>Analytics private</i>' : ''}
+          ${assignment ? `<i>${esc(assignment.role)}</i>` : best.slice(0,2).map(x => `<i>${esc(x.role)}</i>`).join('')}
+        </span>
       </button>`;
     }).join('');
   }
@@ -370,7 +493,7 @@
   }
 
   function openMemberModal(memberId, restoring = false) {
-    const member = (state.cache.members || []).find(m => Number(m.id) === Number(memberId));
+    const member = mergeMemberOverview(state.cache.members || []).find(m => Number(m.id) === Number(memberId));
     if (!member) {
       state.ui.modalMemberId = null;
       return;
@@ -380,11 +503,51 @@
     const plans = buildPlan(state.cache.members || [], state.cache.crimes || []);
     const roles = bestRolesForMember(member, plans).slice(0,6);
     const totals = Object.entries(member.totals || {}).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const analytics = member.analytics;
+    const battle = analytics?.battle;
+    const drugs = analytics?.drugs;
+    const analyticsBody = analytics ? `
+      <section class="member-analytics-section">
+        <div class="analytics-heading"><h4>Battle stats</h4><small>Updated ${formatRelativeDate(analytics.battleSyncedAt)}</small></div>
+        ${battle ? `<div class="battle-stat-grid">
+          <div><span>Strength</span><b>${formatLargeInteger(battle.strength)}</b></div>
+          <div><span>Defense</span><b>${formatLargeInteger(battle.defense)}</b></div>
+          <div><span>Speed</span><b>${formatLargeInteger(battle.speed)}</b></div>
+          <div><span>Dexterity</span><b>${formatLargeInteger(battle.dexterity)}</b></div>
+          <div class="wide"><span>Total battle stats</span><b>${formatLargeInteger(battle.total)}</b></div>
+        </div>` : '<p class="notice">Battle stats were not returned. Add the user:battlestats selection to the API key.</p>'}
+      </section>
+      <section class="member-analytics-section">
+        <div class="analytics-heading"><h4>Drug activity</h4><small>Updated ${formatRelativeDate(analytics.drugsSyncedAt)}</small></div>
+        ${drugs ? `<div class="drug-summary">
+          <div><span>Total used</span><b>${formatNumber(drugs.total)}</b></div>
+          <div><span>Xanax</span><b>${formatNumber(drugs.xanax)}</b></div>
+          <div><span>Overdoses</span><b>${formatNumber(drugs.overdoses)}</b></div>
+          <div><span>Rehabilitations</span><b>${formatNumber(drugs.rehabilitations?.amount)}</b></div>
+        </div>
+        <details class="drug-breakdown"><summary>All tracked drugs</summary><div>
+          ${['cannabis','ecstasy','ketamine','lsd','opium','pcp','shrooms','speed','vicodin','xanax'].map(name => `<span><b>${esc(name)}</b>${formatNumber(drugs[name])}</span>`).join('')}
+        </div></details>` : '<p class="notice">Drug totals were not returned. Add user:personalstats to the API key.</p>'}
+        <div class="cooldown-card"><span>Current drug cooldown</span><b>${analytics.cooldowns ? formatCooldown(analytics.cooldowns.drug) : 'Permission unavailable'}</b></div>
+      </section>
+      <section class="member-analytics-section">
+        <h4>Tracked growth</h4>
+        ${renderAnalyticsGains(analytics)}
+      </section>` : `
+      <p class="notice">${member.analyticsAccess === 'private'
+        ? 'This member has shared analytics, but exact values are private for your Control Center role.'
+        : member.analyticsAccess === 'consent_required'
+          ? 'Enable analytics tracking from the API Key screen to import your battle stats and drug totals.'
+          : member.analyticsAccess === 'not_synced'
+            ? 'Analytics sharing is enabled, but the first synchronization has not completed.'
+            : 'This member has not enabled battle-stat and drug tracking.'}</p>`;
     const modal = root.querySelector('#v111-modal');
     modal.hidden = false;
     modal.innerHTML = `<div class="modal-backdrop" data-close-modal aria-hidden="true"></div><article class="member-modal" role="dialog" aria-modal="true" aria-labelledby="v111-member-modal-title" tabindex="-1">
       <div class="modal-head"><div><h3 id="v111-member-modal-title">${esc(member.name)} [${member.id}]</h3><small>${esc(member.position || 'Faction member')} · Level ${member.level || '?'}</small></div><button data-close-modal aria-label="Close member profile" title="Close">×</button></div>
       <div class="profile-status ${member.isInOc ? 'busy' : 'free'}">${member.isInOc ? 'Currently in an OC' : 'Available for planning'}</div>
+      <div class="member-live-status"><span>${esc(member.status || 'Status unknown')}</span><span>Last action ${formatRelativeDate(member.lastActionAt)}</span></div>
+      ${analyticsBody}
       <h4>Best tracked roles</h4>
       <div class="profile-roles">${roles.length ? roles.map(r => `<div><b>${esc(r.role)}</b><span>${esc(r.crime)} · score ${Math.round(r.score)}</span></div>`).join('') : '<p>No personal stats loaded.</p>'}</div>
       <h4>Strongest tracked categories</h4>
@@ -888,10 +1051,16 @@
       const personalStats = ownMember?.apiStatus === 'ok'
         ? (ownMember.statsSyncedAt ? `Synced ${new Date(ownMember.statsSyncedAt).toLocaleString()}` : 'Synced')
         : 'Not synced yet';
+      const ownAnalytics = state.backend.memberOverview?.members?.find(member => Number(member.id) === Number(user.tornId));
+      const analyticsStatus = user.analyticsConsentAt
+        ? ownAnalytics?.analytics?.syncedAt
+          ? `Synced ${new Date(ownAnalytics.analytics.syncedAt).toLocaleString()}`
+          : 'Enabled; awaiting first synchronization'
+        : 'Not enabled';
       return `
         <div class="backend-card">
           <div class="backend-state connected"><b>Secure backend connected</b><small>${esc(BACKEND_API)}</small></div>
-          <p class="notice api-key-reminder">Enter only your own Torn API key. The first connection may take about a minute while the free Render server wakes up. Your crime stats refresh automatically when you connect and when you return to this screen.</p>
+          <p class="notice api-key-reminder">Enter only your own Torn API key. The first connection may take about a minute while the free Render server wakes up. Your approved statistics refresh automatically when you connect and when you return to this screen.</p>
           <dl>
             <div><dt>Player</dt><dd>${esc(user.name)} [${esc(user.tornId)}]</dd></div>
             <div><dt>Control Center role</dt><dd>${esc(user.role)}</dd></div>
@@ -899,24 +1068,29 @@
             <div><dt>Shared data</dt><dd>${esc(lastSync)}</dd></div>
             <div><dt>Snapshot</dt><dd>${Number(sync?.memberCount || 0)} members · ${Number(sync?.crimeCount || 0)} crimes</dd></div>
             <div><dt>My crime stats</dt><dd>${esc(personalStats)}</dd></div>
+            <div><dt>Battle & drug analytics</dt><dd>${esc(analyticsStatus)}</dd></div>
           </dl>
           <div class="toolbar">
             ${backendCanSync() ? `<button class="primary" data-act="backend-sync"${busyAttributes()}>Sync Vault 111 from Torn</button>` : ''}
-            <button class="primary" data-act="backend-sync-stats"${busyAttributes()}>Sync My Crime Stats</button>
+            <button class="primary" data-act="backend-sync-stats"${busyAttributes()}>Sync My Stats</button>
+            ${user.analyticsConsentAt
+              ? `<button class="danger" data-act="analytics-disable"${busyAttributes()}>Disable Analytics</button>`
+              : `<button data-act="analytics-enable"${busyAttributes()}>Enable Analytics Tracking</button>`}
             <button data-act="load-shared"${busyAttributes()}>Refresh Shared Data</button>
             <button data-act="backend-logout"${busyAttributes()}>Disconnect</button>
           </div>
           ${renderStatusRegion('v111-backend-status', backendFeedback)}
-          <p class="notice">${backendCanSync() ? 'Faction synchronization uses your encrypted key and requires Torn faction API permission. ' : 'Your role can read the latest shared snapshot. '}Your own crime stats are normalized for planner scoring and shared with the faction planner; unrelated personal stats are not collected.</p>
+          <p class="notice">${backendCanSync() ? 'Faction synchronization uses your encrypted key and requires Torn faction API permission. ' : 'Your role can read the latest shared snapshot. '}Crime stats are shared for planner scoring. If analytics tracking is enabled, exact battle stats, drug totals, rehabilitation totals, overdoses, and the current drug cooldown are stored for growth tracking and visible only to you, the Vault 111 Owner, and Administrators.</p>
         </div>`;
     }
     return `
       <div class="backend-card">
         <div class="backend-state"><b>Connect to Vault 111</b><small>${esc(BACKEND_API)}</small></div>
-        <p class="notice api-key-reminder" id="v111-key-help">Enter only your own Torn API key. The first connection may take about a minute while the free Render server wakes up. Your key is sent to the configured Vault 111 backend for identity and faction verification, stored encrypted by the server, and never saved by the userscript. Connecting automatically imports only your crime-category stats for shared planner scoring.</p>
+        <p class="notice api-key-reminder" id="v111-key-help">Enter only your own Torn API key. The first connection may take about a minute while the free Render server wakes up. Your key is sent to the configured Vault 111 backend for identity and faction verification, stored encrypted by the server, and never saved by the userscript.</p>
         <form id="v111-backend-form">
           <label for="v111-backend-key">Your Torn API key</label>
           <input id="v111-backend-key" name="torn-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your API key" aria-describedby="v111-key-help" maxlength="256" required${busyAttributes()}>
+          <label class="analytics-consent"><input id="v111-analytics-consent" type="checkbox" required${busyAttributes()}> I agree to store my exact battle stats, drug totals, rehabilitation totals, overdoses, and drug cooldown for member analytics. Exact values will be visible only to me, the Vault 111 Owner, and Administrators.</label>
           <button class="primary" type="submit"${busyAttributes()}>Connect Securely</button>
         </form>
         ${renderStatusRegion('v111-backend-status', backendFeedback)}
@@ -1084,7 +1258,11 @@
     root.querySelector('[data-act="backend-logout"]')?.addEventListener('click', disconnectBackend);
     root.querySelector('[data-act="backend-sync"]')?.addEventListener('click', () => syncBackendFaction(false, true));
     root.querySelector('[data-act="backend-sync-stats"]')?.addEventListener('click', () => syncBackendPersonalStats());
+    root.querySelector('[data-act="analytics-enable"]')?.addEventListener('click', enableMemberAnalytics);
+    root.querySelector('[data-act="analytics-disable"]')?.addEventListener('click', disableMemberAnalytics);
     root.querySelector('[data-act="load-shared"]')?.addEventListener('click', refreshSharedData);
+    root.querySelector('[data-act="member-refresh"]')?.addEventListener('click', () => refreshMemberOverview(false));
+    root.querySelector('[data-act="member-sync-self"]')?.addEventListener('click', syncMyMemberAnalytics);
     root.querySelector('[data-act="war-sync"]')?.addEventListener('click', synchronizeWarTracker);
     root.querySelector('[data-act="war-refresh"]')?.addEventListener('click', () => refreshWarTracker(false));
     root.querySelector('#v111-payout-settings')?.addEventListener('submit', savePayoutSettings);
@@ -1159,6 +1337,10 @@
       state.ui.memberSearch = event.target.value;
       applyMemberSearch();
     });
+    root.querySelector('#v111-member-filter')?.addEventListener('change', event => {
+      state.ui.memberFilter = event.target.value;
+      applyMemberSearch();
+    });
   }
 
   function activateTab(tab, focusTab = false) {
@@ -1180,6 +1362,11 @@
     if (tab === 'backend') {
       setTimeout(() => {
         if (state.ui.activeTab === 'backend') syncBackendPersonalStats({ automatic: true });
+      }, 0);
+    }
+    if (tab === 'members' && state.backend.connected && !state.backend.memberOverview) {
+      setTimeout(() => {
+        if (state.ui.activeTab === 'members') refreshMemberOverview(true);
       }, 0);
     }
     if (tab === 'war' && state.backend.connected && !state.backend.warSnapshot) {
@@ -1219,8 +1406,17 @@
   function applyMemberSearch() {
     if (!root?.isConnected) return;
     const query = String(state.ui.memberSearch || '').trim().toLowerCase();
+    const filter = String(state.ui.memberFilter || 'all');
     root.querySelectorAll('.member-row').forEach(row => {
-      row.style.display = !query || row.dataset.memberName.includes(query) || row.textContent.toLowerCase().includes(query) ? 'flex' : 'none';
+      const matchesSearch = !query ||
+        row.dataset.memberName.includes(query) ||
+        row.textContent.toLowerCase().includes(query);
+      const status = row.dataset.memberStatus || '';
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'analytics' && row.dataset.memberAnalytics === 'true') ||
+        status === filter;
+      row.style.display = matchesSearch && matchesFilter ? 'flex' : 'none';
     });
   }
 
@@ -1259,6 +1455,7 @@
 
   function feedbackKeyForTab(tab) {
     if (tab === 'dashboard') return 'dashboardStatus';
+    if (tab === 'members') return 'memberStatus';
     if (tab === 'war') return 'warStatus';
     if (tab === 'backend') return 'backendStatus';
     if (tab === 'settings') return 'settingsStatus';
@@ -1492,6 +1689,8 @@
         level: Number(m.level || 0),
         position: m.position || m.position_name || '',
         status: m.status?.state || m.status || '',
+        daysInFaction: Number(m.daysInFaction ?? m.days_in_faction ?? 0),
+        lastActionAt: m.lastActionAt ?? m.last_action?.timestamp ?? null,
         isInOc: Boolean(m.is_in_oc ?? m.isInOc ?? m.organized_crime?.id ?? m.organizedCrime?.id ?? false),
         apiStatus: hasStats ? 'ok' : 'not_registered',
         stats,
@@ -1689,6 +1888,7 @@
     state.backend.connected = false;
     state.backend.user = null;
     state.backend.sync = null;
+    state.backend.memberOverview = null;
     state.backend.warSnapshot = null;
     state.backend.payoutSnapshot = null;
     state.backend.assignments = new Map();
@@ -1728,20 +1928,28 @@
     return Date.now() - lastSync >= STATS_AUTO_SYNC_INTERVAL_MS;
   }
 
-  async function syncOwnCrimeStats(force = false) {
+  async function syncOwnMemberData(force = false) {
     if (!force && !personalStatsAutoSyncDue()) return false;
     await backendApi('POST', '/v1/me/crime-stats/sync', {});
+    let analyticsResult = null;
+    if (state.backend.user?.analyticsConsentAt) {
+      analyticsResult = await backendApi('POST', '/v1/me/analytics/sync', {});
+    }
     save(STORE.backendStatsLastAutoSync, Date.now());
-    return true;
+    return { analyticsResult };
   }
 
   async function connectBackend(event) {
     event.preventDefault();
     if (state.backend.loading) return;
     const input = root.querySelector('#v111-backend-key');
+    const consent = root.querySelector('#v111-analytics-consent');
     const key = input?.value.trim() || '';
     if (!/^[A-Za-z0-9_-]{8,256}$/.test(key)) {
       return setStatus(root.querySelector('#v111-backend-status'), 'That does not look like a valid Torn API key.', true);
+    }
+    if (!consent?.checked) {
+      return setStatus(root.querySelector('#v111-backend-status'), 'Confirm the analytics privacy notice before connecting.', true);
     }
     state.backend.error = '';
     state.ui.backendStatus = null;
@@ -1750,15 +1958,20 @@
     let warning = '';
     try {
       await ensureBackendAwake();
-      const session = await backendRequest('POST', '/v1/auth/login', { body: { apiKey: key } });
+      const session = await backendRequest('POST', '/v1/auth/login', {
+        body: { apiKey: key, analyticsConsent: true }
+      });
       saveBackendSession(session);
       state.backend.connected = true;
       state.backend.user = session.user;
       sessionEstablished = true;
       try {
-        await syncOwnCrimeStats(true);
+        const synced = await syncOwnMemberData(true);
+        if (synced?.analyticsResult?.warnings?.length) {
+          warning = synced.analyticsResult.warnings.join(' ');
+        }
       } catch (error) {
-        warning = `Connected, but your crime stats could not be synced: ${friendly(error)}`;
+        warning = `Connected, but your member stats could not be synced: ${friendly(error)}`;
       }
       try {
         await loadSharedPlan();
@@ -1769,6 +1982,11 @@
         await loadWarSnapshot();
       } catch (error) {
         warning ||= `Connected, but the shared war tracker could not be loaded: ${friendly(error)}`;
+      }
+      try {
+        await loadMemberOverview();
+      } catch (error) {
+        warning ||= `Connected, but member analytics could not be loaded: ${friendly(error)}`;
       }
       state.backend.error = warning;
       setFeedback('backend', warning || 'Connected securely. Your shared planner data is ready.', Boolean(warning));
@@ -1792,9 +2010,12 @@
       state.backend.user = result.user;
       let warning = '';
       try {
-        await syncOwnCrimeStats();
+        const synced = await syncOwnMemberData();
+        if (synced?.analyticsResult?.warnings?.length) {
+          warning = synced.analyticsResult.warnings.join(' ');
+        }
       } catch (error) {
-        warning = `Connected, but your automatic crime-stat refresh failed: ${friendly(error)}`;
+        warning = `Connected, but your automatic member-stat refresh failed: ${friendly(error)}`;
       }
       try {
         await loadSharedPlan();
@@ -1805,6 +2026,11 @@
         await loadWarSnapshot();
       } catch (error) {
         warning ||= `Connected, but the shared war tracker could not be loaded: ${friendly(error)}`;
+      }
+      try {
+        await loadMemberOverview();
+      } catch (error) {
+        warning ||= `Connected, but member analytics could not be loaded: ${friendly(error)}`;
       }
       state.backend.error = warning;
       state.ui.backendStatus = warning ? { text: warning, error: true } : null;
@@ -1841,6 +2067,12 @@
       };
       save(STORE.cache, state.cache);
     }
+    return result;
+  }
+
+  async function loadMemberOverview() {
+    const result = await backendApi('GET', '/v1/members/overview');
+    state.backend.memberOverview = result;
     return result;
   }
 
@@ -2158,12 +2390,14 @@
     if (!beginBackendWork(label, returnTab, !silent)) return;
     try {
       if (backendCanSync()) await backendApi('POST', '/v1/faction/sync', {});
-      await syncOwnCrimeStats(true);
+      const synced = await syncOwnMemberData(true);
       const result = await loadSharedPlan();
+      await loadMemberOverview();
       const memberCount = Number(result?.sync?.memberCount || result?.members?.length || 0);
       const crimeCount = Number(result?.sync?.crimeCount || result?.crimes?.length || 0);
       if (!silent) {
-        setFeedback(returnTab, `Your crime stats were updated. Shared data loaded: ${memberCount} members and ${crimeCount} available crimes.`);
+        const warning = synced?.analyticsResult?.warnings?.join(' ');
+        setFeedback(returnTab, `${warning ? `${warning} ` : ''}Your member stats were updated. Shared data loaded: ${memberCount} members and ${crimeCount} available crimes.`);
       }
     } catch (error) {
       state.backend.error = friendly(error);
@@ -2180,19 +2414,101 @@
     if (!state.backend.connected || (automatic && !personalStatsAutoSyncDue())) return;
     state.backend.error = '';
     state.ui.backendStatus = null;
-    if (!beginBackendWork('Synchronizing your crime stats…', 'backend')) return;
+    if (!beginBackendWork('Synchronizing your crime, battle, and drug stats…', 'backend')) return;
     try {
-      await syncOwnCrimeStats(!automatic);
+      const synced = await syncOwnMemberData(!automatic);
       await loadSharedPlan();
+      await loadMemberOverview();
       state.backend.error = '';
+      const warning = synced?.analyticsResult?.warnings?.join(' ');
       setFeedback('backend', automatic
-        ? 'Your crime stats were refreshed automatically.'
-        : 'Your crime stats were synchronized successfully.');
+        ? `${warning ? `${warning} ` : ''}Your member stats were refreshed automatically.`
+        : `${warning ? `${warning} ` : ''}Your crime, battle, drug, and cooldown statistics were synchronized.`);
     } catch (error) {
       state.backend.error = friendly(error);
       setFeedback('backend', state.backend.error, true);
     } finally {
       finishBackendWork();
+      render();
+    }
+  }
+
+  async function refreshMemberOverview(silent = false) {
+    if (state.backend.loading || !state.backend.connected) return;
+    state.ui.memberStatus = null;
+    if (!beginBackendWork('Refreshing the faction member overview…', 'members', !silent)) return;
+    try {
+      const result = await loadMemberOverview();
+      if (!silent) {
+        setFeedback('members', `Member overview refreshed: ${formatNumber(result?.summary?.analyticsShared)} members sharing analytics.`);
+      }
+    } catch (error) {
+      setFeedback('members', friendly(error), true);
+    } finally {
+      finishBackendWork();
+      state.ui.activeTab = 'members';
+      render();
+    }
+  }
+
+  async function syncMyMemberAnalytics() {
+    if (state.backend.loading || !state.backend.connected) return;
+    if (!state.backend.user?.analyticsConsentAt) {
+      setFeedback('members', 'Enable analytics tracking from the API Key screen first.', true);
+      render();
+      return;
+    }
+    state.ui.memberStatus = null;
+    if (!beginBackendWork('Synchronizing your battle stats, drug totals, and cooldown…', 'members')) return;
+    try {
+      const result = await syncOwnMemberData(true);
+      await loadMemberOverview();
+      const warning = result?.analyticsResult?.warnings?.join(' ');
+      setFeedback('members', warning || 'Your member analytics were synchronized successfully.', Boolean(warning));
+    } catch (error) {
+      setFeedback('members', friendly(error), true);
+    } finally {
+      finishBackendWork();
+      state.ui.activeTab = 'members';
+      render();
+    }
+  }
+
+  async function enableMemberAnalytics() {
+    if (state.backend.loading || !state.backend.connected) return;
+    if (!window.confirm('Enable storage of your exact battle stats, drug totals, rehabilitation totals, overdoses, and drug cooldown? Exact values will be visible only to you, the Vault 111 Owner, and Administrators.')) return;
+    if (!beginBackendWork('Enabling and synchronizing member analytics…', 'backend')) return;
+    try {
+      const consent = await backendApi('PUT', '/v1/me/analytics-consent', { accepted: true });
+      state.backend.user.analyticsConsentAt = consent.analyticsConsentAt;
+      const result = await syncOwnMemberData(true);
+      await loadMemberOverview();
+      const warning = result?.analyticsResult?.warnings?.join(' ');
+      setFeedback('backend', warning || 'Member analytics tracking is enabled and synchronized.', Boolean(warning));
+    } catch (error) {
+      setFeedback('backend', friendly(error), true);
+    } finally {
+      finishBackendWork();
+      state.ui.activeTab = 'backend';
+      render();
+    }
+  }
+
+  async function disableMemberAnalytics() {
+    if (state.backend.loading || !state.backend.connected) return;
+    if (!window.confirm('Disable analytics tracking and permanently delete your stored battle-stat and drug history from the Control Center?')) return;
+    if (!beginBackendWork('Deleting your stored member analytics…', 'backend')) return;
+    try {
+      await backendApi('PUT', '/v1/me/analytics-consent', { accepted: false });
+      state.backend.user.analyticsConsentAt = null;
+      save(STORE.backendStatsLastAutoSync, 0);
+      await loadMemberOverview();
+      setFeedback('backend', 'Analytics tracking was disabled and your stored analytics history was deleted.');
+    } catch (error) {
+      setFeedback('backend', friendly(error), true);
+    } finally {
+      finishBackendWork();
+      state.ui.activeTab = 'backend';
       render();
     }
   }
@@ -2278,6 +2594,7 @@
   function setStatus(element, text, error = false) {
     if (element?.id === 'v111-dashboard-status') state.ui.dashboardStatus = { text, error };
     if (element?.id === 'v111-status') state.ui.plannerStatus = { text, error };
+    if (element?.id === 'v111-member-status') state.ui.memberStatus = { text, error };
     if (element?.id === 'v111-backend-status') state.ui.backendStatus = { text, error };
     if (element?.id === 'v111-settings-status') state.ui.settingsStatus = { text, error };
     if (element) {
@@ -2630,14 +2947,23 @@
       #v111-ocp .poor { background:#722f38 !important; color:#ffd5da !important; }
       #v111-ocp .planner-controls, #v111-ocp .member-tools { display:flex !important; justify-content:space-between !important; align-items:center !important; gap:8px !important; margin:10px 0 !important; flex-wrap:wrap !important; }
       #v111-ocp select, #v111-ocp .member-tools input { background:#101820 !important; color:#eef5ff !important; border:1px solid #405a72 !important; border-radius:6px !important; padding:7px !important; }
+      #v111-ocp .member-summary { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:6px !important; margin-bottom:6px !important; }
+      #v111-ocp .member-summary > div { display:grid !important; gap:2px !important; min-width:0 !important; padding:8px 5px !important; border:1px solid #2f4e66 !important; border-radius:7px !important; background:#142432 !important; text-align:center !important; }
+      #v111-ocp .member-summary b { color:#fff !important; font-size:16px !important; }
+      #v111-ocp .member-summary span { color:#a9bfd1 !important; font-size:9px !important; }
+      #v111-ocp .member-privacy { margin:0 0 7px !important; color:#a9bfd1 !important; font-size:9px !important; }
+      #v111-ocp .member-tools > label:not(.sr-only) { display:flex !important; align-items:center !important; gap:5px !important; color:#b9cddd !important; font-size:9px !important; }
       #v111-ocp .crime-title-actions { display:flex !important; align-items:center !important; gap:7px !important; flex:0 0 auto !important; }
       #v111-ocp .crime-readiness { height:4px !important; background:#0b1117 !important; overflow:hidden !important; }
       #v111-ocp .crime-readiness i { display:block !important; height:100% !important; }
       #v111-ocp button.player-link { display:block !important; padding:0 !important; min-height:0 !important; margin-top:4px !important; border:0 !important; background:transparent !important; color:#fff !important; font-weight:800 !important; text-align:left !important; }
       #v111-ocp .member-list { display:grid !important; gap:5px !important; }
       #v111-ocp button.member-row { display:flex !important; justify-content:space-between !important; align-items:center !important; width:100% !important; padding:8px !important; text-align:left !important; }
+      #v111-ocp .member-identity { display:grid !important; gap:2px !important; min-width:0 !important; }
+      #v111-ocp .member-identity b, #v111-ocp .member-identity small { overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }
       #v111-ocp .member-tags { display:flex !important; gap:4px !important; flex-wrap:wrap !important; justify-content:flex-end !important; }
       #v111-ocp .member-tags i { font-style:normal !important; font-size:10px !important; background:#24415a !important; border-radius:5px !important; padding:3px 5px !important; }
+      #v111-ocp .member-tags i.analytics-tag { background:#31552f !important; color:#d9f3d7 !important; }
       #v111-ocp #v111-modal[hidden] { display:none !important; }
       #v111-ocp #v111-modal { position:fixed !important; inset:0 !important; z-index:2147483647 !important; display:block !important; }
       #v111-ocp .modal-backdrop { position:absolute !important; inset:0 !important; background:rgba(0,0,0,.75) !important; }
@@ -2647,6 +2973,25 @@
       #v111-ocp .profile-status { margin:10px 0 !important; padding:7px !important; border-radius:6px !important; font-weight:800 !important; }
       #v111-ocp .profile-status.free { background:#173b29 !important; color:#c4f3d5 !important; }
       #v111-ocp .profile-status.busy { background:#49262b !important; color:#ffd7dc !important; }
+      #v111-ocp .member-live-status { display:flex !important; justify-content:space-between !important; gap:8px !important; margin-bottom:8px !important; color:#b7c9d9 !important; font-size:10px !important; }
+      #v111-ocp .member-analytics-section { margin:9px 0 !important; padding:8px !important; border:1px solid #2d4b62 !important; border-radius:7px !important; background:#101d28 !important; }
+      #v111-ocp .member-analytics-section h4 { margin:0 0 6px !important; color:#f2c94c !important; }
+      #v111-ocp .analytics-heading { display:flex !important; align-items:center !important; justify-content:space-between !important; gap:8px !important; }
+      #v111-ocp .battle-stat-grid, #v111-ocp .drug-summary { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:5px !important; }
+      #v111-ocp .battle-stat-grid > div, #v111-ocp .drug-summary > div, #v111-ocp .cooldown-card { display:grid !important; gap:2px !important; min-width:0 !important; padding:6px !important; border-radius:5px !important; background:#182b3a !important; }
+      #v111-ocp .battle-stat-grid .wide { grid-column:1 / -1 !important; }
+      #v111-ocp .battle-stat-grid span, #v111-ocp .drug-summary span, #v111-ocp .cooldown-card span { color:#9fb5c8 !important; font-size:9px !important; }
+      #v111-ocp .battle-stat-grid b, #v111-ocp .drug-summary b, #v111-ocp .cooldown-card b { color:#fff !important; overflow-wrap:anywhere !important; }
+      #v111-ocp .drug-breakdown { margin:6px 0 !important; }
+      #v111-ocp .drug-breakdown summary { cursor:pointer !important; color:#bed8eb !important; font-weight:800 !important; }
+      #v111-ocp .drug-breakdown > div { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:3px !important; margin-top:5px !important; }
+      #v111-ocp .drug-breakdown span { display:flex !important; justify-content:space-between !important; gap:5px !important; padding:4px 5px !important; border-radius:4px !important; background:#182b3a !important; }
+      #v111-ocp .drug-breakdown b { color:#b9d4e8 !important; text-transform:capitalize !important; }
+      #v111-ocp .analytics-trends { display:grid !important; gap:4px !important; }
+      #v111-ocp .analytics-trends > div { display:grid !important; grid-template-columns:minmax(78px,1fr) repeat(3,minmax(0,1fr)) !important; gap:4px !important; padding:5px !important; border-radius:5px !important; background:#182b3a !important; }
+      #v111-ocp .analytics-trends span { color:#c3d5e4 !important; font-size:9px !important; text-align:right !important; overflow-wrap:anywhere !important; }
+      #v111-ocp .analytics-consent { display:flex !important; align-items:flex-start !important; gap:7px !important; grid-column:1 / -1 !important; padding:7px !important; border:1px solid #3c5a70 !important; border-radius:6px !important; background:#132431 !important; color:#c5d7e5 !important; font-size:10px !important; line-height:1.35 !important; }
+      #v111-ocp .analytics-consent input { flex:0 0 auto !important; width:16px !important; height:16px !important; margin:1px 0 0 !important; }
       #v111-ocp .profile-roles, #v111-ocp .stat-bars { display:grid !important; gap:5px !important; }
       #v111-ocp .profile-roles div, #v111-ocp .stat-bars div { display:flex !important; justify-content:space-between !important; gap:10px !important; padding:7px !important; background:#182531 !important; border-radius:6px !important; }
       #v111-ocp.compact .reason, #v111-ocp.compact .breakdown, #v111-ocp.compact .alts { display:none !important; }
@@ -2674,6 +3019,12 @@
         #v111-ocp .queue-timer { min-width:96px !important; font-size:9px !important; }
         #v111-ocp .queue-score, #v111-ocp .readiness-badge { padding:3px 5px !important; font-size:9px !important; }
         #v111-ocp .planner-controls, #v111-ocp .member-tools { gap:4px !important; margin:5px 0 !important; }
+        #v111-ocp .member-summary { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:3px !important; }
+        #v111-ocp .member-summary > div { padding:5px 3px !important; }
+        #v111-ocp .member-summary b { font-size:13px !important; }
+        #v111-ocp .member-tools { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+        #v111-ocp .member-tools > * { min-width:0 !important; width:100% !important; }
+        #v111-ocp .member-tools #v111-member-search { grid-column:1 / -1 !important; }
         #v111-ocp select, #v111-ocp input { min-height:34px !important; padding:5px !important; font-size:11px !important; }
         #v111-ocp .notice, #v111-ocp .empty, #v111-ocp .status { padding:6px !important; margin-bottom:5px !important; }
         #v111-ocp .crime-card { margin:5px 0 !important; border-radius:7px !important; }
@@ -2698,10 +3049,15 @@
         #v111-ocp #v111-backend-form input { height:34px !important; padding:5px !important; font-size:11px !important; }
         #v111-ocp .setting-row { gap:5px !important; margin:6px 0 !important; }
         #v111-ocp .member-tags i { padding:2px 4px !important; font-size:8px !important; }
+        #v111-ocp button.member-row { align-items:flex-start !important; flex-direction:column !important; gap:4px !important; }
+        #v111-ocp .member-tags { justify-content:flex-start !important; }
         #v111-ocp .queue-row { align-items:flex-start !important; }
         #v111-ocp .queue-right { align-items:flex-end !important; flex-direction:column !important; }
         #v111-ocp .member-modal { right:6vw !important; width:min(88vw,360px) !important; max-height:40vh !important; padding:7px !important; font-size:10px !important; }
         #v111-ocp .profile-status { margin:5px 0 !important; padding:5px !important; }
+        #v111-ocp .member-analytics-section { margin:5px 0 !important; padding:5px !important; }
+        #v111-ocp .analytics-trends > div { grid-template-columns:1fr !important; }
+        #v111-ocp .analytics-trends span { text-align:left !important; }
         #v111-ocp .profile-roles div, #v111-ocp .stat-bars div { gap:5px !important; padding:5px !important; }
       }
       @media(pointer:coarse) and (min-width:601px) {

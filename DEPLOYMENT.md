@@ -55,7 +55,7 @@ After the deployed health endpoint returns `ok: true` and `database: connected`,
 npm run client:configure -- https://control.your-domain.example
 ```
 
-Install the resulting `client/Vault-111-Control-Center-v3.2.0-alpha.1-production.user.js`. The generator adds only the exact backend hostname to `@connect`; it does not use a wildcard or include secrets.
+Install the resulting `client/Vault-111-Control-Center-v3.3.0-alpha.1-production.user.js`. The generator adds only the exact backend hostname to `@connect`; it does not use a wildcard or include secrets.
 
 ## Before inviting faction members
 
@@ -67,3 +67,4 @@ Install the resulting `client/Vault-111-Control-Center-v3.2.0-alpha.1-production
 6. Verify logs redact authorization headers, API keys, access tokens, and refresh tokens.
 7. Publish a short privacy notice explaining stored fields, retention, deletion, and contact information.
 8. Pilot with officers before distributing to the full faction.
+9. Verify analytics consent, exact-stat visibility, consent withdrawal/deletion, and privileged-read audit events.
