@@ -104,6 +104,11 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("row.outsideChainHits");
     expect(client).not.toContain("Payout weights must total 100%.");
     expect(client).toContain("Download CSV");
+    expect(client).toContain("Open Faction Payout");
+    expect(client).toContain("FACTION_PAYOUT_URL");
+    expect(client).toContain('data-label="Final payout"');
+    expect(client).toContain("grid-template-columns:minmax(108px,1.2fr) minmax(84px,1fr)");
+    expect(client).not.toContain("grid-template-columns:minmax(130px,1.25fr) minmax(110px,1fr)");
     expect(client).toContain("Payout report copied to the clipboard.");
     expect(client).not.toContain("minimum participation");
   });

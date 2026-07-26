@@ -26,6 +26,7 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - stores immutable finalized member amounts so later war synchronization cannot silently alter a locked report;
 - lets Owner and Admin reopen a finalized report, with every settings, adjustment, finalize, and reopen action audited;
 - copies faction-ready payout summaries and downloads CSV reports without including access tokens or API keys;
+- keeps final payout amounts inside the planner on desktop and mobile, and links directly to Torn's faction payout controls;
 - shows a locally updating countdown to each Planning Queue crime's synchronized Torn `ready_at` time without making extra API requests.
 - preserves the current tab, scroll position, member search, and keyboard focus during client redraws and background synchronization;
 - exposes accessible tabs, labeled inputs, focus-managed member dialogs, live status announcements, reduced-motion behavior, and guarded loading states.

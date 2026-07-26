@@ -34,6 +34,7 @@ This is a production-minded backend scaffold plus a minimal Tampermonkey connect
 - Deterministic whole-dollar allocation, manual bonuses or deductions, and optional adjustment notes
 - Finalized payout snapshots that remain locked even if later Torn synchronization changes the attack history
 - Owner/Admin/War Manager payout editing, read-only faction-member reports, Admin/Owner reopening, CSV downloads, and audit events
+- Responsive payout rows that keep base and final amounts visible, plus a direct link to Torn's faction payout controls
 
 ## Local setup
 

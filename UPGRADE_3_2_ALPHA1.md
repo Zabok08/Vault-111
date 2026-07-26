@@ -8,6 +8,7 @@ This release adds the Ranked War Payout Calculator. It preserves the completed O
 - Configurable whole-dollar payout pool
 - Fixed payout points: ranked-war hit 1, out-of-war chain hit 0.5, and out-of-war non-chain hit 0.25
 - Respect and assists excluded from payout calculations
+- Responsive payout rows that keep final amounts visible and a direct Torn faction payout link
 - Expanded outgoing-attack ingestion across the ranked-war time window while keeping the War Tracker display limited to actual ranked-war hits
 - Deterministic whole-dollar rounding that allocates the complete base pool
 - Per-member manual bonuses, deductions, and optional notes

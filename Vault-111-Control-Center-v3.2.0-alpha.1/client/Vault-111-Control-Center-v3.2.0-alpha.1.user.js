@@ -39,6 +39,7 @@
   const STATS_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
   const CRIME_URL = 'https://www.torn.com/factions.php?step=your&type=1#/tab=crimes';
   const WAR_URL = 'https://www.torn.com/factions.php?step=your&type=1#/tab=war/rank';
+  const FACTION_PAYOUT_URL = 'https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user';
   const TAB_IDS = ['dashboard', 'plan', 'members', 'war', 'payouts', 'backend', 'settings'];
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -776,6 +777,7 @@
         <button class="primary" data-act="payout-refresh"${busyAttributes()}>Refresh Payouts</button>
         <button data-act="payout-copy"${snapshot?.plan ? '' : ' disabled'}>Copy Report</button>
         <button data-act="payout-csv"${snapshot?.plan ? '' : ' disabled'}>Download CSV</button>
+        <a class="button" href="${FACTION_PAYOUT_URL}" target="_blank" rel="noopener">Open Faction Payout</a>
         <button data-jump="war">Open War Tracker</button>
       </div>
       ${renderStatusRegion('v111-payout-status', feedback)}`;
@@ -852,7 +854,7 @@
                 <small>${esc(row.position || 'Member')} · ${(Number(row.share || 0) * 100).toFixed(2)}% share</small>
               </span>
               <span class="payout-activity"><b>${Number(row.points || 0).toFixed(2)} points</b><small>${formatNumber(row.warHits)} war · ${formatNumber(row.chainHits)} OOW chain · ${formatNumber(row.outsideChainHits)} OOW non-chain</small></span>
-              <strong>${formatMoney(row.baseAmount)}</strong>
+              <strong class="payout-base" data-label="Base">${formatMoney(row.baseAmount)}</strong>
               <span class="payout-adjustment">
                 ${canManage && !finalized ? `
                   <label class="sr-only" for="v111-payout-adjustment-${Number(row.tornId)}">Adjustment for ${esc(row.name)}</label>
@@ -865,7 +867,7 @@
                   ${row.adjustmentNote ? `<small>${esc(row.adjustmentNote)}</small>` : ''}
                 `}
               </span>
-              <strong class="payout-final">${formatMoney(row.finalAmount)}</strong>
+              <strong class="payout-final" data-label="Final payout">${formatMoney(row.finalAmount)}</strong>
             </article>`).join('') : '<div class="empty">No ranked-war activity is available for this payout report.</div>'}
         </div>
       ` : `
@@ -2513,19 +2515,23 @@
       #v111-ocp .payout-metrics { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:6px !important; margin:8px 0 !important; }
       #v111-ocp .notice.success { border-color:#347651 !important; background:#163625 !important; color:#c9f1d7 !important; }
       #v111-ocp .payout-actions { display:flex !important; justify-content:flex-end !important; gap:6px !important; margin:7px 0 !important; }
-      #v111-ocp .payout-list { display:grid !important; gap:4px !important; }
-      #v111-ocp .payout-table-head, #v111-ocp .payout-row { display:grid !important; grid-template-columns:minmax(130px,1.25fr) minmax(110px,1fr) 82px minmax(130px,1.2fr) 92px !important; align-items:center !important; gap:7px !important; padding:7px 8px !important; }
+      #v111-ocp .payout-list { display:grid !important; min-width:0 !important; max-width:100% !important; gap:4px !important; overflow:hidden !important; }
+      #v111-ocp .payout-table-head, #v111-ocp .payout-row { display:grid !important; grid-template-columns:minmax(108px,1.2fr) minmax(84px,1fr) minmax(60px,.65fr) minmax(100px,1fr) minmax(72px,.75fr) !important; align-items:center !important; gap:5px !important; min-width:0 !important; max-width:100% !important; padding:6px !important; }
       #v111-ocp .payout-table-head { color:#9fb4c8 !important; font-size:9px !important; font-weight:800 !important; text-transform:uppercase !important; }
-      #v111-ocp .payout-row { border:1px solid #2a4358 !important; border-radius:7px !important; background:#142330 !important; }
-      #v111-ocp .payout-row > strong { color:#eaf4ff !important; text-align:right !important; }
+      #v111-ocp .payout-row { border:1px solid #2a4358 !important; border-radius:7px !important; background:#142330 !important; overflow:hidden !important; }
+      #v111-ocp .payout-row > strong { min-width:0 !important; color:#eaf4ff !important; font-size:11px !important; text-align:right !important; overflow-wrap:anywhere !important; }
+      #v111-ocp .payout-row > strong::before { display:none !important; }
       #v111-ocp .payout-member, #v111-ocp .payout-activity, #v111-ocp .payout-adjustment { display:grid !important; gap:3px !important; min-width:0 !important; }
       #v111-ocp .payout-member a { color:#dcedfb !important; font-weight:800 !important; text-decoration:none !important; overflow-wrap:anywhere !important; }
       #v111-ocp .payout-member small, #v111-ocp .payout-activity small, #v111-ocp .payout-adjustment small { color:#9fb5c8 !important; overflow-wrap:anywhere !important; }
-      #v111-ocp .payout-adjustment { grid-template-columns:minmax(72px,.7fr) minmax(100px,1.3fr) auto !important; align-items:center !important; }
+      #v111-ocp .payout-adjustment { grid-template-columns:minmax(0,1fr) auto !important; align-items:center !important; }
+      #v111-ocp .payout-adjustment [data-payout-adjustment] { grid-column:1 / -1 !important; }
+      #v111-ocp .payout-adjustment [data-payout-note] { grid-column:1 !important; }
+      #v111-ocp .payout-adjustment .mini { grid-column:2 !important; }
       #v111-ocp .payout-adjustment > b, #v111-ocp .payout-adjustment > small { grid-column:1 / -1 !important; }
       #v111-ocp .payout-adjustment .positive { color:#8ee0ae !important; }
       #v111-ocp .payout-adjustment .negative { color:#ff9ea7 !important; }
-      #v111-ocp .payout-final { color:#f2c94c !important; font-size:13px !important; }
+      #v111-ocp .payout-final { color:#f2c94c !important; font-size:12px !important; }
       @media(max-width:600px) {
         #v111-ocp:not(.collapsed) { right:6px !important; top:50% !important; bottom:auto !important; transform:translateY(-50%) !important; width:min(88vw,360px) !important; max-height:40vh !important; font-size:12px !important; }
         #v111-ocp:not(.collapsed) .body { max-height:none !important; }
@@ -2564,12 +2570,14 @@
         #v111-ocp .payout-readonly-config, #v111-ocp .payout-metrics { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:3px !important; }
         #v111-ocp .payout-readonly-config span, #v111-ocp .payout-metrics > div { padding:5px !important; }
         #v111-ocp .payout-table-head { display:none !important; }
-        #v111-ocp .payout-row { grid-template-columns:1fr auto !important; gap:5px !important; padding:6px !important; }
-        #v111-ocp .payout-member { grid-column:1 !important; }
-        #v111-ocp .payout-activity { grid-column:1 !important; }
-        #v111-ocp .payout-row > strong:not(.payout-final) { grid-column:2 !important; grid-row:1 !important; }
-        #v111-ocp .payout-adjustment { grid-column:1 / -1 !important; grid-template-columns:minmax(65px,.7fr) minmax(90px,1.3fr) auto !important; padding-top:5px !important; border-top:1px solid #2a4155 !important; }
-        #v111-ocp .payout-final { grid-column:2 !important; grid-row:2 !important; }
+        #v111-ocp .payout-row { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:5px !important; padding:6px !important; }
+        #v111-ocp .payout-member { grid-column:1 / -1 !important; grid-row:1 !important; }
+        #v111-ocp .payout-activity { grid-column:1 / -1 !important; grid-row:2 !important; }
+        #v111-ocp .payout-row > strong { grid-row:3 !important; padding:5px 6px !important; border:1px solid #2a4155 !important; border-radius:5px !important; background:#101d28 !important; }
+        #v111-ocp .payout-row > strong::before { display:block !important; margin-bottom:2px !important; color:#91a9bc !important; font-size:8px !important; font-weight:800 !important; letter-spacing:.04em !important; text-transform:uppercase !important; content:attr(data-label) !important; }
+        #v111-ocp .payout-base { grid-column:1 !important; text-align:left !important; }
+        #v111-ocp .payout-final { grid-column:2 !important; text-align:right !important; }
+        #v111-ocp .payout-adjustment { grid-column:1 / -1 !important; grid-row:4 !important; grid-template-columns:minmax(0,1fr) auto !important; padding-top:5px !important; border-top:1px solid #2a4155 !important; }
       }
 
       #v111-ocp .planning-group { display:block !important; margin:10px 0 !important; padding:0 !important; border:1px solid #31516d !important; border-radius:8px !important; overflow:hidden !important; background:#101923 !important; }
