@@ -55,7 +55,7 @@ After the deployed health endpoint returns `ok: true` and `database: connected`,
 npm run client:configure -- https://control.your-domain.example
 ```
 
-Install the resulting `client/Vault-111-Control-Center-v3.3.0-alpha.1-production.user.js`. The generator adds only the exact backend hostname to `@connect`; it does not use a wildcard or include secrets.
+Install the resulting `client/Vault-111-Control-Center-v3.3.0-alpha.2-production.user.js`. The generator adds only the exact backend hostname to `@connect`; it does not use a wildcard or include secrets.
 
 ## Before inviting faction members
 

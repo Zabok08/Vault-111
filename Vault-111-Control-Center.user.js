@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.3.0-alpha.1
+// @version      3.3.0-alpha.2
 // @description  Vault 111 OC planning, war tracking, payouts, and privacy-aware member analytics.
 // @author       Vault 111
 // @match        https://www.torn.com/*
@@ -21,7 +21,7 @@
   if (document.getElementById(INSTANCE_MARKER_ID)) return;
   const instanceMarker = document.createElement('meta');
   instanceMarker.id = INSTANCE_MARKER_ID;
-  instanceMarker.dataset.version = '3.3.0-alpha.1';
+  instanceMarker.dataset.version = '3.3.0-alpha.2';
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
@@ -54,6 +54,8 @@
       error: '',
       sync: null,
       memberOverview: null,
+      memberWarHistory: new Map(),
+      memberWarHistoryLoading: new Set(),
       warSnapshot: null,
       payoutSnapshot: null,
       assignments: new Map(),
@@ -156,7 +158,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.3 alpha.1 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.3 alpha.2 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
@@ -492,6 +494,96 @@
     return [...deduped.values()];
   }
 
+  function formatWarHistoryDate(value) {
+    const time = timestampMs(value);
+    if (!time) return 'Date unavailable';
+    return new Date(time).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  function renderMemberWarHistory(memberId) {
+    const history = state.backend.memberWarHistory.get(Number(memberId));
+    const loading = state.backend.memberWarHistoryLoading.has(Number(memberId));
+    if (!state.backend.connected) {
+      return `<section class="member-history-section">
+        <h4>War &amp; payout history</h4>
+        <p class="notice">Connect on the API Key screen to load shared ranked-war history.</p>
+      </section>`;
+    }
+    if (loading || !history) {
+      return `<section class="member-history-section" aria-busy="true">
+        <div class="analytics-heading"><h4>War &amp; payout history</h4><small>Last five wars</small></div>
+        <p class="notice">Loading ranked-war history…</p>
+      </section>`;
+    }
+    if (history.error) {
+      return `<section class="member-history-section">
+        <div class="analytics-heading"><h4>War &amp; payout history</h4><small>Last five wars</small></div>
+        <p class="notice">${esc(history.error)}</p>
+        <button class="mini" data-retry-member-history="${Number(memberId)}">Try again</button>
+      </section>`;
+    }
+    const rows = history.wars || [];
+    if (!rows.length) {
+      return `<section class="member-history-section">
+        <div class="analytics-heading"><h4>War &amp; payout history</h4><small>Last five wars</small></div>
+        <p class="notice">No synchronized ranked-war history is available yet.</p>
+      </section>`;
+    }
+    return `<section class="member-history-section">
+      <div class="analytics-heading"><h4>War &amp; payout history</h4><small>Last ${formatNumber(rows.length)} synchronized war${rows.length === 1 ? '' : 's'}</small></div>
+      <div class="history-summary">
+        <div><span>Successful hits</span><b>${formatNumber(history.summary?.successfulHits)}</b></div>
+        <div><span>Payout points</span><b>${formatNumber(history.summary?.points)}</b></div>
+        <div><span>Finalized pay</span><b>${formatMoney(history.summary?.finalizedPayoutTotal || '0')}</b></div>
+      </div>
+      <div class="member-war-list">${rows.map(war => {
+        const performance = war.performance || {};
+        const payout = war.payout;
+        const payoutText = payout?.status === 'FINALIZED'
+          ? `Final payout ${formatMoney(payout.finalAmount || '0')}`
+          : payout?.status === 'DRAFT'
+            ? 'Payout draft not finalized'
+            : 'No payout report';
+        return `<article class="member-war-row">
+          <div class="member-war-head">
+            <b>vs ${esc(war.opponentName || `Faction ${war.opponentFactionId}`)}</b>
+            <i class="history-outcome ${esc(war.outcome || 'completed')}">${esc(war.outcome || 'completed')}</i>
+          </div>
+          <small>${formatWarHistoryDate(war.startsAt)} · War #${Number(war.id)}</small>
+          <div class="member-war-metrics">
+            <span><b>${formatNumber(performance.warHits)}</b> war</span>
+            <span><b>${formatNumber(performance.chainHits)}</b> OOW chain</span>
+            <span><b>${formatNumber(performance.outsideChainHits)}</b> OOW other</span>
+            <span><b>${formatNumber(performance.points)}</b> pts</span>
+          </div>
+          <div class="member-war-payout ${payout?.status === 'FINALIZED' ? 'finalized' : ''}">${esc(payoutText)}</div>
+        </article>`;
+      }).join('')}</div>
+    </section>`;
+  }
+
+  async function loadMemberWarHistory(memberId, force = false) {
+    const id = Number(memberId);
+    if (!id || !state.backend.connected || state.backend.memberWarHistoryLoading.has(id)) return;
+    if (!force && state.backend.memberWarHistory.has(id)) return;
+    state.backend.memberWarHistoryLoading.add(id);
+    if (force) state.backend.memberWarHistory.delete(id);
+    if (state.ui.modalMemberId === id) openMemberModal(id, true);
+    try {
+      const result = await backendApi('GET', `/v1/members/${encodeURIComponent(id)}/war-history`);
+      state.backend.memberWarHistory.set(id, result);
+    } catch (error) {
+      state.backend.memberWarHistory.set(id, { error: friendly(error), wars: [] });
+    } finally {
+      state.backend.memberWarHistoryLoading.delete(id);
+      if (state.ui.modalMemberId === id) openMemberModal(id, true);
+    }
+  }
+
   function openMemberModal(memberId, restoring = false) {
     const member = mergeMemberOverview(state.cache.members || []).find(m => Number(m.id) === Number(memberId));
     if (!member) {
@@ -548,6 +640,7 @@
       <div class="profile-status ${member.isInOc ? 'busy' : 'free'}">${member.isInOc ? 'Currently in an OC' : 'Available for planning'}</div>
       <div class="member-live-status"><span>${esc(member.status || 'Status unknown')}</span><span>Last action ${formatRelativeDate(member.lastActionAt)}</span></div>
       ${analyticsBody}
+      ${renderMemberWarHistory(member.id)}
       <h4>Best tracked roles</h4>
       <div class="profile-roles">${roles.length ? roles.map(r => `<div><b>${esc(r.role)}</b><span>${esc(r.crime)} · score ${Math.round(r.score)}</span></div>`).join('') : '<p>No personal stats loaded.</p>'}</div>
       <h4>Strongest tracked categories</h4>
@@ -555,8 +648,20 @@
       <div class="toolbar"><a class="button primary" href="https://www.torn.com/profiles.php?XID=${member.id}" target="_blank" rel="noopener">Open profile</a></div>
     </article>`;
     modal.querySelectorAll('[data-close-modal]').forEach(element => element.addEventListener('click', closeMemberModal));
+    modal.querySelector('[data-retry-member-history]')?.addEventListener('click', buttonEvent => {
+      loadMemberWarHistory(buttonEvent.currentTarget.dataset.retryMemberHistory, true);
+    });
     modal.addEventListener('keydown', trapModalFocus);
-    requestAnimationFrame(() => modal.querySelector('[data-close-modal]')?.focus({ preventScroll: true }));
+    if (!restoring) {
+      requestAnimationFrame(() => modal.querySelector('[data-close-modal]')?.focus({ preventScroll: true }));
+    }
+    if (
+      state.backend.connected &&
+      !state.backend.memberWarHistory.has(Number(member.id)) &&
+      !state.backend.memberWarHistoryLoading.has(Number(member.id))
+    ) {
+      loadMemberWarHistory(member.id);
+    }
   }
 
   function closeMemberModal() {
@@ -1889,6 +1994,8 @@
     state.backend.user = null;
     state.backend.sync = null;
     state.backend.memberOverview = null;
+    state.backend.memberWarHistory = new Map();
+    state.backend.memberWarHistoryLoading = new Set();
     state.backend.warSnapshot = null;
     state.backend.payoutSnapshot = null;
     state.backend.assignments = new Map();
@@ -2080,6 +2187,7 @@
     const result = await backendApi('GET', '/v1/war/snapshot');
     state.backend.warSnapshot = result;
     state.backend.payoutSnapshot = null;
+    state.backend.memberWarHistory = new Map();
     return result;
   }
 
@@ -2990,6 +3098,26 @@
       #v111-ocp .analytics-trends { display:grid !important; gap:4px !important; }
       #v111-ocp .analytics-trends > div { display:grid !important; grid-template-columns:minmax(78px,1fr) repeat(3,minmax(0,1fr)) !important; gap:4px !important; padding:5px !important; border-radius:5px !important; background:#182b3a !important; }
       #v111-ocp .analytics-trends span { color:#c3d5e4 !important; font-size:9px !important; text-align:right !important; overflow-wrap:anywhere !important; }
+      #v111-ocp .member-history-section { margin:9px 0 !important; padding:8px !important; border:1px solid #395c75 !important; border-radius:7px !important; background:#101d28 !important; }
+      #v111-ocp .member-history-section h4 { margin:0 0 6px !important; color:#f2c94c !important; }
+      #v111-ocp .history-summary { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:4px !important; margin-bottom:6px !important; }
+      #v111-ocp .history-summary > div { display:grid !important; gap:2px !important; min-width:0 !important; padding:5px !important; border-radius:5px !important; background:#182b3a !important; }
+      #v111-ocp .history-summary span { color:#9fb5c8 !important; font-size:8px !important; }
+      #v111-ocp .history-summary b { color:#fff !important; font-size:11px !important; overflow-wrap:anywhere !important; }
+      #v111-ocp .member-war-list { display:grid !important; gap:5px !important; }
+      #v111-ocp .member-war-row { display:grid !important; gap:4px !important; min-width:0 !important; padding:6px !important; border:1px solid #29475e !important; border-radius:6px !important; background:#152837 !important; }
+      #v111-ocp .member-war-head { display:flex !important; align-items:center !important; justify-content:space-between !important; gap:6px !important; min-width:0 !important; }
+      #v111-ocp .member-war-head > b { min-width:0 !important; color:#e8f3fc !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }
+      #v111-ocp .history-outcome { flex:0 0 auto !important; padding:2px 5px !important; border-radius:999px !important; background:#30465a !important; color:#d8e5ef !important; font-size:8px !important; font-style:normal !important; font-weight:900 !important; text-transform:uppercase !important; }
+      #v111-ocp .history-outcome.won { background:#1d603c !important; color:#c8f5d9 !important; }
+      #v111-ocp .history-outcome.lost { background:#722f38 !important; color:#ffd5da !important; }
+      #v111-ocp .history-outcome.active { background:#705a25 !important; color:#fff0b7 !important; }
+      #v111-ocp .member-war-row > small { color:#90a9bc !important; }
+      #v111-ocp .member-war-metrics { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:3px !important; }
+      #v111-ocp .member-war-metrics span { display:grid !important; gap:1px !important; padding:4px !important; border-radius:4px !important; background:#0f1d28 !important; color:#9fb5c8 !important; font-size:8px !important; text-align:center !important; }
+      #v111-ocp .member-war-metrics b { color:#fff !important; font-size:10px !important; }
+      #v111-ocp .member-war-payout { padding:4px 5px !important; border-radius:4px !important; background:#202f3b !important; color:#afc0cd !important; font-size:9px !important; font-weight:800 !important; }
+      #v111-ocp .member-war-payout.finalized { background:#173b29 !important; color:#c4f3d5 !important; }
       #v111-ocp .analytics-consent { display:flex !important; align-items:flex-start !important; gap:7px !important; grid-column:1 / -1 !important; padding:7px !important; border:1px solid #3c5a70 !important; border-radius:6px !important; background:#132431 !important; color:#c5d7e5 !important; font-size:10px !important; line-height:1.35 !important; }
       #v111-ocp .analytics-consent input { flex:0 0 auto !important; width:16px !important; height:16px !important; margin:1px 0 0 !important; }
       #v111-ocp .profile-roles, #v111-ocp .stat-bars { display:grid !important; gap:5px !important; }
@@ -3056,6 +3184,9 @@
         #v111-ocp .member-modal { right:6vw !important; width:min(88vw,360px) !important; max-height:40vh !important; padding:7px !important; font-size:10px !important; }
         #v111-ocp .profile-status { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-analytics-section { margin:5px 0 !important; padding:5px !important; }
+        #v111-ocp .member-history-section { margin:5px 0 !important; padding:5px !important; }
+        #v111-ocp .history-summary { gap:3px !important; }
+        #v111-ocp .member-war-metrics { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
         #v111-ocp .analytics-trends > div { grid-template-columns:1fr !important; }
         #v111-ocp .analytics-trends span { text-align:left !important; }
         #v111-ocp .profile-roles div, #v111-ocp .stat-bars div { gap:5px !important; padding:5px !important; }

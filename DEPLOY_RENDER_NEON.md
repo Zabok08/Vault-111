@@ -103,7 +103,7 @@ https://vault111-control-center.onrender.com/health
 Continue only when it reports:
 
 ```json
-{"ok":true,"version":"3.3.0-alpha.1","database":"connected"}
+{"ok":true,"version":"3.3.0-alpha.2","database":"connected"}
 ```
 
 The first visit after inactivity can take about one minute on the free service.
@@ -119,7 +119,7 @@ npm run client:configure -- https://vault111-control-center.onrender.com
 Replace the example address with the one Render assigned. This creates:
 
 ```text
-client/Vault-111-Control-Center-v3.3.0-alpha.1-production.user.js
+client/Vault-111-Control-Center-v3.3.0-alpha.2-production.user.js
 ```
 
 The generated file contains only the public HTTPS backend address and its exact Tampermonkey `@connect` hostname. It contains no server secret or Torn API key.

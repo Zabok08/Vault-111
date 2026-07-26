@@ -1,4 +1,4 @@
-# Vault 111 Control Center — Version 3.3 alpha.1
+# Vault 111 Control Center — Version 3.3 alpha.2
 
 This is a production-minded backend scaffold plus a minimal Tampermonkey connection layer. It does not replace the Version 2 planner: the planner remains the UI and local optimizer.
 
@@ -39,6 +39,7 @@ This is a production-minded backend scaffold plus a minimal Tampermonkey connect
 - Six-hour analytics snapshots with previous-sync, 24-hour, 7-day, and 30-day growth calculations
 - Exact analytics visible only to the member, Owner, and Administrators; privileged reads and consent changes are audited
 - Searchable Member Overview with faction status, last action, OC availability, privacy-aware profiles, and mobile layouts
+- On-demand member profiles with the last five synchronized ranked wars, fixed-rule hit points, payout status, and finalized payout totals
 - One-click consent withdrawal that deletes the member's stored analytics and history
 
 ## Local setup
@@ -71,7 +72,7 @@ Requirements: Node.js 22+, Docker Desktop (or PostgreSQL 15+), and Tampermonkey.
    ```
 
 6. Confirm `http://127.0.0.1:3000/health`.
-7. Install `client/Vault-111-Control-Center-v3.3.0-alpha.1.user.js` in Tampermonkey.
+7. Install `client/Vault-111-Control-Center-v3.3.0-alpha.2.user.js` in Tampermonkey.
 
 ## First shared synchronization
 
@@ -122,6 +123,7 @@ Unmapped positions remain read-only Members. The `OWNER` role cannot be granted 
 | POST | `/v1/me/crime-stats/sync` | Authenticated; self only |
 | GET | `/v1/me/crime-stats` | Authenticated; self only |
 | GET | `/v1/members/overview` | `members.read`; exact analytics additionally require self or `members.analytics.read_all` |
+| GET | `/v1/members/:tornId/war-history` | `members.read`; target must be an active member of the same faction |
 | POST | `/v1/faction/sync` | `oc.sync` |
 | GET | `/v1/faction/members` | `oc.read` |
 | GET | `/v1/oc/snapshot` | `oc.read` |

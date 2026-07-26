@@ -22,6 +22,8 @@ The shared ingestion snapshot stores only planning fields: member identity, fact
 
 Member analytics require explicit consent. The service requests only `user:battlestats`, the drugs category from `user:personalstats`, and `user:cooldowns`. It retains normalized battle values, named-drug totals, overdoses, rehabilitation totals, the current drug cooldown, and six-hour growth snapshots. Exact analytics are returned only to that member or a backend-authorized Owner/Administrator. Privileged overview reads and consent changes create audit events. Withdrawing consent deletes the current record and all stored snapshots for that member.
 
+Member war-and-payout history is shared faction-management data derived only from the backend's already synchronized ranked-war attacks and payout reports. The endpoint verifies that the requested Torn ID is an active member of the authenticated user's faction, returns at most five wars, and never includes API keys, sessions, battle stats, or private analytics.
+
 ## Threats still requiring work
 
 - Refresh-token reuse detection should revoke the entire token family.
