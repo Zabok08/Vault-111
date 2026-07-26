@@ -28,10 +28,25 @@ try {
       `Torn user ${tornId} has not connected to the backend yet. Connect once from the userscript, then rerun this command.`
     );
   }
-  const updated = await prisma.user.update({
-    where: { tornId },
-    data: { role: "OWNER" },
-    select: { tornId: true, name: true, role: true }
+  const now = new Date();
+  const updated = await prisma.$transaction(async transaction => {
+    const granted = await transaction.user.update({
+      where: { tornId },
+      data: {
+        role: "OWNER",
+        sessionVersion: { increment: 1 },
+        adminVersion: { increment: 1 }
+      },
+      select: { id: true, tornId: true, name: true, role: true }
+    });
+    await transaction.session.updateMany({
+      where: {
+        userId: granted.id,
+        revokedAt: null
+      },
+      data: { revokedAt: now }
+    });
+    return granted;
   });
   console.log(`Granted ${updated.name} [${updated.tornId}] the ${updated.role} role.`);
 } finally {

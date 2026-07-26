@@ -19,7 +19,8 @@ describe("scheduler permissions and reminder normalization", () => {
     const base = {
       tornId: 42,
       factionId: 123,
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     };
 
     expect(allowedScheduleEventTypes({

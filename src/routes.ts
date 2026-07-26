@@ -48,6 +48,13 @@ import {
   saveNotificationPreferences,
   updateScheduleEvent
 } from "./scheduler.js";
+import {
+  deleteRoleMapping,
+  readAdminOverview,
+  revokeUserSessions,
+  saveRoleMapping,
+  setUserSuspension
+} from "./admin.js";
 
 const loginBody = z.object({
   apiKey: z.string().trim().min(8).max(256),
@@ -116,6 +123,30 @@ const notificationPreferenceBody = z.object({
   eventTypes: z.array(z.nativeEnum(ScheduleEventType)).min(1).max(6),
   reminderMinutes: z.array(z.number().int().min(0).max(10_080)).min(1).max(5)
 });
+const roleMappingParams = z.object({
+  factionPosition: z.string().trim().min(1).max(100)
+});
+const roleMappingBody = z.object({
+  appRole: z.nativeEnum(AppRole).refine(role => role !== AppRole.OWNER, {
+    message: "The Owner role cannot be assigned through a faction-position mapping"
+  }),
+  expectedVersion: z.number().int().min(0)
+});
+const roleMappingDeleteQuery = z.object({
+  expectedVersion: z.coerce.number().int().positive()
+});
+const adminUserParams = z.object({
+  userId: z.string().min(1).max(128)
+});
+const adminVersionBody = z.object({
+  expectedVersion: z.number().int().positive()
+});
+const adminSuspensionBody = adminVersionBody.extend({
+  suspended: z.boolean()
+});
+const adminAuditQuery = z.object({
+  limit: z.coerce.number().int().min(10).max(100).default(50)
+});
 const warPayoutSettingsBody = z.object({
   poolAmount: z.string().regex(/^\d+$/).max(16),
   expectedVersion: z.number().int().min(0)
@@ -137,11 +168,11 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      return { ok: true, version: "3.5.0-alpha.1", database: "connected" };
+      return { ok: true, version: "3.6.0-alpha.1", database: "connected" };
     } catch {
       return reply.code(503).send({
         ok: false,
-        version: "3.5.0-alpha.1",
+        version: "3.6.0-alpha.1",
         database: "unavailable"
       });
     }
@@ -159,6 +190,9 @@ export async function registerRoutes(app: FastifyInstance) {
         })
       : null;
     const existing = await db.user.findUnique({ where: { tornId: identity.tornId } });
+    if (existing?.isSuspended) {
+      throw Object.assign(new Error("Account suspended"), { statusCode: 403 });
+    }
     const role = existing?.role === AppRole.OWNER ? AppRole.OWNER : mapping?.appRole ?? AppRole.MEMBER;
     const encryptedApiKey = encryptSecret(apiKey, `torn-api-key:${identity.tornId}`);
     const user = await db.user.upsert({
@@ -802,9 +836,150 @@ export async function registerRoutes(app: FastifyInstance) {
     return { assignment };
   });
 
+  app.get("/v1/admin/overview", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "admin.read");
+    return readAdminOverview(principal);
+  });
+
+  app.put(
+    "/v1/admin/role-mappings/:factionPosition",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async request => {
+      const principal = await authenticate(request);
+      requirePermission(principal, "admin.manage");
+      const params = roleMappingParams.parse(request.params);
+      const body = roleMappingBody.parse(request.body);
+      const result = await saveRoleMapping({
+        principal,
+        factionPosition: params.factionPosition,
+        appRole: body.appRole,
+        expectedVersion: body.expectedVersion
+      });
+      await audit(
+        request,
+        principal.id,
+        "admin.role_mapping.save",
+        "role_mapping",
+        result.mapping.id,
+        {
+          factionPosition: result.mapping.factionPosition,
+          appRole: result.mapping.appRole,
+          version: result.mapping.version,
+          affectedUsers: result.affectedUsers,
+          unchanged: result.unchanged
+        }
+      );
+      return result;
+    }
+  );
+
+  app.delete("/v1/admin/role-mappings/:factionPosition", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "admin.manage");
+    const params = roleMappingParams.parse(request.params);
+    const query = roleMappingDeleteQuery.parse(request.query);
+    const result = await deleteRoleMapping({
+      principal,
+      factionPosition: params.factionPosition,
+      expectedVersion: query.expectedVersion
+    });
+    await audit(
+      request,
+      principal.id,
+      "admin.role_mapping.delete",
+      "role_mapping",
+      params.factionPosition,
+      {
+        expectedVersion: query.expectedVersion,
+        affectedUsers: result.affectedUsers
+      }
+    );
+    return { deleted: true, ...result };
+  });
+
+  app.put("/v1/admin/users/:userId/suspension", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "admin.manage");
+    const params = adminUserParams.parse(request.params);
+    const body = adminSuspensionBody.parse(request.body);
+    const result = await setUserSuspension({
+      principal,
+      userId: params.userId,
+      suspended: body.suspended,
+      expectedVersion: body.expectedVersion
+    });
+    await audit(
+      request,
+      principal.id,
+      body.suspended ? "admin.user.suspend" : "admin.user.restore",
+      "user",
+      result.user.id,
+      {
+        tornId: result.user.tornId,
+        role: result.user.role,
+        revokedSessions: result.revokedSessions
+      }
+    );
+    return {
+      suspended: result.suspended,
+      revokedSessions: result.revokedSessions
+    };
+  });
+
+  app.post("/v1/admin/users/:userId/revoke-sessions", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "admin.manage");
+    const params = adminUserParams.parse(request.params);
+    const body = adminVersionBody.parse(request.body);
+    const result = await revokeUserSessions({
+      principal,
+      userId: params.userId,
+      expectedVersion: body.expectedVersion
+    });
+    await audit(
+      request,
+      principal.id,
+      "admin.user.sessions.revoke",
+      "user",
+      result.user.id,
+      {
+        tornId: result.user.tornId,
+        role: result.user.role,
+        revokedSessions: result.revokedSessions
+      }
+    );
+    return { revokedSessions: result.revokedSessions };
+  });
+
   app.get("/v1/admin/audit", async (request) => {
     const principal = await authenticate(request);
     requirePermission(principal, "audit.read");
-    return { events: await db.auditEvent.findMany({ take: 100, orderBy: { createdAt: "desc" } }) };
+    const query = adminAuditQuery.parse(request.query);
+    const events = await db.auditEvent.findMany({
+      where: {
+        actor: {
+          is: { factionId: principal.factionId }
+        }
+      },
+      take: query.limit,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        resource: true,
+        resourceId: true,
+        metadata: true,
+        createdAt: true,
+        actor: {
+          select: {
+            tornId: true,
+            name: true,
+            role: true
+          }
+        }
+      }
+    });
+    return { events };
   });
 }

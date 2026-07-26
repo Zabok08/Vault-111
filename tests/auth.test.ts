@@ -21,7 +21,8 @@ describe("server-enforced permissions", () => {
       tornId: 42,
       factionId: 123,
       role: "MEMBER",
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     } as const;
 
     expect(() => requirePermission(member, "oc.read")).not.toThrow();
@@ -45,6 +46,12 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(member, "schedule.manage")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
+    expect(() => requirePermission(member, "admin.read")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
+    expect(() => requirePermission(member, "admin.manage")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
     expect(() => requirePermission(member, "announcements.manage")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
@@ -57,7 +64,8 @@ describe("server-enforced permissions", () => {
       tornId: 43,
       factionId: 123,
       role: "OC_PLANNER",
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     } as const;
 
     expect(() => requirePermission(planner, "oc.sync")).not.toThrow();
@@ -74,7 +82,8 @@ describe("server-enforced permissions", () => {
       tornId: 44,
       factionId: 123,
       role: "WAR_MANAGER",
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     } as const;
 
     expect(() => requirePermission(warManager, "war.sync")).not.toThrow();
@@ -95,7 +104,8 @@ describe("server-enforced permissions", () => {
       tornId: 45,
       factionId: 123,
       role: "OFFICER",
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     } as const;
 
     expect(() => requirePermission(officer, "war.read")).not.toThrow();
@@ -116,7 +126,8 @@ describe("server-enforced permissions", () => {
       tornId: 46,
       factionId: 123,
       role: "ADMIN",
-      isSuspended: false
+      isSuspended: false,
+      sessionVersion: 1
     } as const;
 
     expect(() => requirePermission(administrator, "war.payout.manage")).not.toThrow();
@@ -125,5 +136,26 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(administrator, "members.analytics.read_all")).not.toThrow();
     expect(() => requirePermission(administrator, "announcements.manage")).not.toThrow();
     expect(() => requirePermission(administrator, "schedule.manage")).not.toThrow();
+    expect(() => requirePermission(administrator, "admin.read")).not.toThrow();
+    expect(() => requirePermission(administrator, "admin.manage")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
+  });
+
+  it("reserves administration mutations for the Owner wildcard role", async () => {
+    const { issueAccessToken, requirePermission } = await import("../src/auth.js");
+    const { decodeJwt } = await import("jose");
+    const owner = {
+      id: "owner",
+      tornId: 47,
+      factionId: 123,
+      role: "OWNER",
+      isSuspended: false,
+      sessionVersion: 1
+    } as const;
+
+    expect(() => requirePermission(owner, "admin.read")).not.toThrow();
+    expect(() => requirePermission(owner, "admin.manage")).not.toThrow();
+    expect(decodeJwt(await issueAccessToken(owner)).sessionVersion).toBe(1);
   });
 });

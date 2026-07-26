@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.5.0-alpha.1.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.1.user.js"),
   "utf8"
 );
 
@@ -114,7 +114,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.5.0-alpha.1");
+    expect(client).toContain("@version      3.6.0-alpha.1");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -159,5 +159,20 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("GM_notification");
     expect(client).toContain("scheduleNotificationLog");
     expect(client).toContain("Browser notifications work while Torn is open.");
+  });
+
+  it("adds a protected administration and permissions module without exposing keys", () => {
+    expect(client).toContain('data-tab="admin"');
+    expect(client).toContain("renderAdminPanel()");
+    expect(client).toContain("backendCanAdminRead()");
+    expect(client).toContain("backendCanAdminManage()");
+    expect(client).toContain("backendApi('GET', '/v1/admin/overview'");
+    expect(client).toContain("'/v1/admin/audit?limit=100'");
+    expect(client).toContain("/v1/admin/role-mappings/");
+    expect(client).toContain("/suspension");
+    expect(client).toContain("/revoke-sessions");
+    expect(client).toContain("API connection status only—keys are never shown");
+    expect(client).not.toContain("apiKeyFingerprint");
+    expect(client).not.toContain("encryptedApiKey");
   });
 });

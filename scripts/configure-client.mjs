@@ -14,9 +14,9 @@ if (backend.pathname !== "/" || backend.search || backend.hash) {
   throw new Error("Use only the HTTPS origin, without a path, query string, or fragment.");
 }
 
-const sourcePath = resolve("client/Vault-111-Control-Center-v3.5.0-alpha.1.user.js");
+const sourcePath = resolve("client/Vault-111-Control-Center-v3.6.0-alpha.1.user.js");
 const outputPath = resolve(
-  process.argv[3] || "client/Vault-111-Control-Center-v3.5.0-alpha.1-production.user.js"
+  process.argv[3] || "client/Vault-111-Control-Center-v3.6.0-alpha.1-production.user.js"
 );
 let source = await readFile(sourcePath, "utf8");
 

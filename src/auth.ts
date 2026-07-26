@@ -6,10 +6,15 @@ import { db } from "./db.js";
 
 const secret = new TextEncoder().encode(config.JWT_SECRET);
 
-export type Principal = Pick<User, "id" | "tornId" | "factionId" | "role" | "isSuspended">;
+export type Principal = Pick<User, "id" | "tornId" | "factionId" | "role" | "isSuspended" | "sessionVersion">;
 
 export async function issueAccessToken(user: Principal) {
-  return new SignJWT({ tornId: user.tornId, factionId: user.factionId, role: user.role })
+  return new SignJWT({
+    tornId: user.tornId,
+    factionId: user.factionId,
+    role: user.role,
+    sessionVersion: user.sessionVersion
+  })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(user.id)
     .setIssuer(config.JWT_ISSUER)
@@ -34,14 +39,16 @@ export async function authenticate(request: FastifyRequest): Promise<Principal> 
         tornId: true,
         factionId: true,
         role: true,
-        isSuspended: true
+        isSuspended: true,
+        sessionVersion: true
       }
     });
     if (
       !user ||
       user.isSuspended ||
       user.tornId !== Number(payload.tornId) ||
-      user.factionId !== Number(payload.factionId)
+      user.factionId !== Number(payload.factionId) ||
+      user.sessionVersion !== Number(payload.sessionVersion)
     ) {
       throw new Error("Invalid session");
     }
@@ -71,6 +78,7 @@ const permissions: Record<AppRole, Set<string>> = {
     "announcements.manage",
     "schedule.read",
     "schedule.manage",
+    "admin.read",
     "roles.read",
     "audit.read"
   ]),

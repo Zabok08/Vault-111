@@ -33,17 +33,50 @@ try {
       `No active faction member currently has the exact position "${factionPosition}". Synchronize first and check the spelling.`
     );
   }
-  await prisma.roleMapping.upsert({
-    where: {
-      factionId_factionPosition: {
-        factionId,
-        factionPosition
+  const now = new Date();
+  const affected = await prisma.$transaction(async transaction => {
+    await transaction.roleMapping.upsert({
+      where: {
+        factionId_factionPosition: {
+          factionId,
+          factionPosition
+        }
+      },
+      create: { factionId, factionPosition, appRole },
+      update: {
+        appRole,
+        version: { increment: 1 }
       }
-    },
-    create: { factionId, factionPosition, appRole },
-    update: { appRole }
+    });
+    const users = await transaction.user.findMany({
+      where: {
+        factionId,
+        factionPosition,
+        role: { not: "OWNER" }
+      },
+      select: { id: true }
+    });
+    const userIds = users.map(user => user.id);
+    if (userIds.length) {
+      await transaction.user.updateMany({
+        where: { id: { in: userIds } },
+        data: {
+          role: appRole,
+          sessionVersion: { increment: 1 },
+          adminVersion: { increment: 1 }
+        }
+      });
+      await transaction.session.updateMany({
+        where: {
+          userId: { in: userIds },
+          revokedAt: null
+        },
+        data: { revokedAt: now }
+      });
+    }
+    return userIds.length;
   });
-  console.log(`Mapped Torn position "${factionPosition}" to ${appRole}.`);
+  console.log(`Mapped Torn position "${factionPosition}" to ${appRole}. ${affected} user session(s) must reconnect.`);
 } finally {
   await prisma.$disconnect();
 }

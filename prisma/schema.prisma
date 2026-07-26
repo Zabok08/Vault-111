@@ -45,6 +45,8 @@ model User {
   factionPosition        String?
   role                   AppRole                 @default(MEMBER)
   isSuspended            Boolean                 @default(false)
+  sessionVersion         Int                     @default(1)
+  adminVersion           Int                     @default(1)
   encryptedApiKey        String?
   apiKeyFingerprint      String?
   apiKeyUpdatedAt        DateTime?
@@ -395,6 +397,7 @@ model RoleMapping {
   factionId       Int
   factionPosition String
   appRole         AppRole
+  version         Int      @default(1)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

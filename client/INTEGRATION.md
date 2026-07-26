@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.5.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.6.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 
@@ -49,6 +49,11 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - lets each member select reminder times and event types without changing anyone else's preferences;
 - shows deduplicated in-panel reminders and optional Tampermonkey notifications while Torn remains open;
 - adds the next five scheduled events to the unified Dashboard.
+- shows an Administration tab only to authenticated Owner and Administrator roles;
+- gives Administrators read-only views of position mappings, user access, safe API connection status, synchronization health, and audit history;
+- gives only the Owner controls to save/remove role mappings, suspend/restore users, and revoke sessions;
+- never receives encrypted API keys, key fingerprints, refresh-token hashes, IP hashes, or user-agent strings from an administration endpoint;
+- signs affected users out after permission and access changes so backend-enforced roles take effect immediately.
 
 Before deployment, change `BACKEND_API` and replace the localhost `@connect` entries with the exact HTTPS production hostname. Do not use `@connect *`.
 
