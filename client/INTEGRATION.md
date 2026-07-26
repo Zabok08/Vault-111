@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.4.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.5.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 
@@ -44,6 +44,11 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - keeps the navigation in a separate fixed layer so scrolling tab content cannot overlap it;
 - uses smaller mobile typography, spacing, cards, form controls, and two-column action toolbars.
 - sizes the content area from the header's actual rendered height so the panel's bottom edge is not clipped.
+- provides a shared Schedule tab with live countdowns, event filters, and permission-aware create/edit/delete controls;
+- shows synchronized Ranked War starts and OC-ready times as automatic, read-only schedule events;
+- lets each member select reminder times and event types without changing anyone else's preferences;
+- shows deduplicated in-panel reminders and optional Tampermonkey notifications while Torn remains open;
+- adds the next five scheduled events to the unified Dashboard.
 
 Before deployment, change `BACKEND_API` and replace the localhost `@connect` entries with the exact HTTPS production hostname. Do not use `@connect *`.
 

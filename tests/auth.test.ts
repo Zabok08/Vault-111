@@ -41,6 +41,10 @@ describe("server-enforced permissions", () => {
       expect.objectContaining({ statusCode: 403 })
     );
     expect(() => requirePermission(member, "dashboard.read")).not.toThrow();
+    expect(() => requirePermission(member, "schedule.read")).not.toThrow();
+    expect(() => requirePermission(member, "schedule.manage")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
     expect(() => requirePermission(member, "announcements.manage")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
@@ -59,6 +63,8 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(planner, "oc.sync")).not.toThrow();
     expect(() => requirePermission(planner, "war.read")).not.toThrow();
     expect(() => requirePermission(planner, "war.sync")).toThrow();
+    expect(() => requirePermission(planner, "schedule.manage_oc")).not.toThrow();
+    expect(() => requirePermission(planner, "schedule.manage_war")).toThrow();
   });
 
   it("allows War Managers to synchronize wars without OC assignment access", async () => {
@@ -75,6 +81,8 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(warManager, "war.manage")).not.toThrow();
     expect(() => requirePermission(warManager, "war.payout.manage")).not.toThrow();
     expect(() => requirePermission(warManager, "war.payout.reopen")).toThrow();
+    expect(() => requirePermission(warManager, "schedule.manage_war")).not.toThrow();
+    expect(() => requirePermission(warManager, "schedule.manage_oc")).toThrow();
     expect(() => requirePermission(warManager, "oc.assign")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
@@ -95,6 +103,7 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(officer, "war.payout.read")).not.toThrow();
     expect(() => requirePermission(officer, "war.payout.manage")).toThrow();
     expect(() => requirePermission(officer, "announcements.manage")).not.toThrow();
+    expect(() => requirePermission(officer, "schedule.manage")).not.toThrow();
     expect(() => requirePermission(officer, "war.sync")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
@@ -115,5 +124,6 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(administrator, "members.read")).not.toThrow();
     expect(() => requirePermission(administrator, "members.analytics.read_all")).not.toThrow();
     expect(() => requirePermission(administrator, "announcements.manage")).not.toThrow();
+    expect(() => requirePermission(administrator, "schedule.manage")).not.toThrow();
   });
 });

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { AppRole } from "@prisma/client";
+import { AppRole, ScheduleEventType } from "@prisma/client";
 import { z } from "zod";
 import { db } from "./db.js";
 import { config } from "./config.js";
@@ -41,6 +41,13 @@ import {
   readDashboardSnapshot,
   updateAnnouncement
 } from "./dashboard.js";
+import {
+  createScheduleEvent,
+  deleteScheduleEvent,
+  readScheduleSnapshot,
+  saveNotificationPreferences,
+  updateScheduleEvent
+} from "./scheduler.js";
 
 const loginBody = z.object({
   apiKey: z.string().trim().min(8).max(256),
@@ -87,6 +94,28 @@ const announcementUpdateBody = announcementBody.extend({
 const announcementDeleteQuery = z.object({
   expectedVersion: z.coerce.number().int().positive()
 });
+const scheduleEventParams = z.object({
+  eventId: z.string().min(1).max(128)
+});
+const scheduleEventBody = z.object({
+  type: z.nativeEnum(ScheduleEventType),
+  title: z.string().trim().min(3).max(120),
+  description: z.string().trim().max(2000).nullable().transform(value => value || null),
+  startsAt: z.string().datetime().transform(value => new Date(value)),
+  endsAt: z.string().datetime().nullable().transform(value => value ? new Date(value) : null)
+});
+const scheduleEventUpdateBody = scheduleEventBody.extend({
+  expectedVersion: z.number().int().positive()
+});
+const scheduleEventDeleteQuery = z.object({
+  expectedVersion: z.coerce.number().int().positive()
+});
+const notificationPreferenceBody = z.object({
+  enabled: z.boolean(),
+  browserNotifications: z.boolean(),
+  eventTypes: z.array(z.nativeEnum(ScheduleEventType)).min(1).max(6),
+  reminderMinutes: z.array(z.number().int().min(0).max(10_080)).min(1).max(5)
+});
 const warPayoutSettingsBody = z.object({
   poolAmount: z.string().regex(/^\d+$/).max(16),
   expectedVersion: z.number().int().min(0)
@@ -108,11 +137,11 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      return { ok: true, version: "3.4.0-alpha.1", database: "connected" };
+      return { ok: true, version: "3.5.0-alpha.1", database: "connected" };
     } catch {
       return reply.code(503).send({
         ok: false,
-        version: "3.4.0-alpha.1",
+        version: "3.5.0-alpha.1",
         database: "unavailable"
       });
     }
@@ -437,6 +466,119 @@ export async function registerRoutes(app: FastifyInstance) {
       { expectedVersion: query.expectedVersion }
     );
     return { deleted: true };
+  });
+
+  app.get("/v1/schedule", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "schedule.read");
+    return readScheduleSnapshot(principal);
+  });
+
+  app.post(
+    "/v1/schedule/events",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async request => {
+      const principal = await authenticate(request);
+      requirePermission(principal, "schedule.read");
+      const body = scheduleEventBody.parse(request.body);
+      const event = await createScheduleEvent({
+        principal,
+        ...body
+      });
+      await audit(
+        request,
+        principal.id,
+        "schedule.event.create",
+        "schedule_event",
+        event.id,
+        {
+          type: event.type,
+          title: event.title,
+          startsAt: event.startsAt.toISOString(),
+          endsAt: event.endsAt?.toISOString() ?? null
+        }
+      );
+      return { event };
+    }
+  );
+
+  app.put("/v1/schedule/events/:eventId", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "schedule.read");
+    const params = scheduleEventParams.parse(request.params);
+    const body = scheduleEventUpdateBody.parse(request.body);
+    const event = await updateScheduleEvent({
+      principal,
+      id: params.eventId,
+      ...body
+    });
+    await audit(
+      request,
+      principal.id,
+      "schedule.event.update",
+      "schedule_event",
+      event.id,
+      {
+        type: event.type,
+        title: event.title,
+        startsAt: event.startsAt.toISOString(),
+        endsAt: event.endsAt?.toISOString() ?? null,
+        version: event.version
+      }
+    );
+    return { event };
+  });
+
+  app.delete("/v1/schedule/events/:eventId", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "schedule.read");
+    const params = scheduleEventParams.parse(request.params);
+    const query = scheduleEventDeleteQuery.parse(request.query);
+    await deleteScheduleEvent({
+      principal,
+      id: params.eventId,
+      expectedVersion: query.expectedVersion
+    });
+    await audit(
+      request,
+      principal.id,
+      "schedule.event.delete",
+      "schedule_event",
+      params.eventId,
+      { expectedVersion: query.expectedVersion }
+    );
+    return { deleted: true };
+  });
+
+  app.put("/v1/me/notification-preferences", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "schedule.read");
+    const body = notificationPreferenceBody.parse(request.body);
+    const preference = await saveNotificationPreferences({
+      principal,
+      ...body
+    });
+    await audit(
+      request,
+      principal.id,
+      "notification.preferences.update",
+      "notification_preference",
+      principal.id,
+      {
+        enabled: preference.enabled,
+        browserNotifications: preference.browserNotifications,
+        eventTypes: preference.eventTypes,
+        reminderMinutes: preference.reminderMinutes
+      }
+    );
+    return {
+      preferences: {
+        enabled: preference.enabled,
+        browserNotifications: preference.browserNotifications,
+        eventTypes: preference.eventTypes,
+        reminderMinutes: preference.reminderMinutes
+      }
+    };
   });
 
   app.get("/v1/oc/snapshot", async request => {

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.4.0-alpha.1.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.5.0-alpha.1.user.js"),
   "utf8"
 );
 
@@ -114,7 +114,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.4.0-alpha.1");
+    expect(client).toContain("@version      3.5.0-alpha.1");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -146,5 +146,18 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("data-edit-announcement");
     expect(client).toContain("data-delete-announcement");
     expect(client).toContain("Announcement messages must contain 1 to 2,000 characters.");
+  });
+
+  it("adds the shared scheduler, automatic events, and member reminder preferences", () => {
+    expect(client).toContain('data-tab="schedule"');
+    expect(client).toContain("renderSchedulePanel()");
+    expect(client).toContain("backendApi('GET', '/v1/schedule'");
+    expect(client).toContain("backendApi('POST', '/v1/schedule/events'");
+    expect(client).toContain("backendApi('PUT', '/v1/me/notification-preferences'");
+    expect(client).toContain("My notification preferences");
+    expect(client).toContain("Upcoming events");
+    expect(client).toContain("GM_notification");
+    expect(client).toContain("scheduleNotificationLog");
+    expect(client).toContain("Browser notifications work while Torn is open.");
   });
 });

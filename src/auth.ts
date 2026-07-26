@@ -69,13 +69,15 @@ const permissions: Record<AppRole, Set<string>> = {
     "members.analytics.read_all",
     "dashboard.read",
     "announcements.manage",
+    "schedule.read",
+    "schedule.manage",
     "roles.read",
     "audit.read"
   ]),
-  OC_PLANNER: new Set(["oc.read", "oc.sync", "oc.assign", "oc.optimize", "war.read", "war.payout.read", "members.read", "dashboard.read"]),
-  WAR_MANAGER: new Set(["oc.read", "war.read", "war.sync", "war.manage", "war.notes", "war.payout.read", "war.payout.manage", "members.read", "dashboard.read"]),
-  OFFICER: new Set(["oc.read", "war.read", "war.notes", "war.payout.read", "members.read", "dashboard.read", "announcements.manage"]),
-  MEMBER: new Set(["oc.read", "war.read", "war.payout.read", "members.read", "dashboard.read"])
+  OC_PLANNER: new Set(["oc.read", "oc.sync", "oc.assign", "oc.optimize", "war.read", "war.payout.read", "members.read", "dashboard.read", "schedule.read", "schedule.manage_oc"]),
+  WAR_MANAGER: new Set(["oc.read", "war.read", "war.sync", "war.manage", "war.notes", "war.payout.read", "war.payout.manage", "members.read", "dashboard.read", "schedule.read", "schedule.manage_war"]),
+  OFFICER: new Set(["oc.read", "war.read", "war.notes", "war.payout.read", "members.read", "dashboard.read", "announcements.manage", "schedule.read", "schedule.manage"]),
+  MEMBER: new Set(["oc.read", "war.read", "war.payout.read", "members.read", "dashboard.read", "schedule.read"])
 };
 
 export function hasPermission(principal: Principal, permission: string) {
