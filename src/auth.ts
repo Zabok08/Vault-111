@@ -67,13 +67,15 @@ const permissions: Record<AppRole, Set<string>> = {
     "war.payout.reopen",
     "members.read",
     "members.analytics.read_all",
+    "dashboard.read",
+    "announcements.manage",
     "roles.read",
     "audit.read"
   ]),
-  OC_PLANNER: new Set(["oc.read", "oc.sync", "oc.assign", "oc.optimize", "war.read", "war.payout.read", "members.read"]),
-  WAR_MANAGER: new Set(["oc.read", "war.read", "war.sync", "war.manage", "war.notes", "war.payout.read", "war.payout.manage", "members.read"]),
-  OFFICER: new Set(["oc.read", "war.read", "war.notes", "war.payout.read", "members.read"]),
-  MEMBER: new Set(["oc.read", "war.read", "war.payout.read", "members.read"])
+  OC_PLANNER: new Set(["oc.read", "oc.sync", "oc.assign", "oc.optimize", "war.read", "war.payout.read", "members.read", "dashboard.read"]),
+  WAR_MANAGER: new Set(["oc.read", "war.read", "war.sync", "war.manage", "war.notes", "war.payout.read", "war.payout.manage", "members.read", "dashboard.read"]),
+  OFFICER: new Set(["oc.read", "war.read", "war.notes", "war.payout.read", "members.read", "dashboard.read", "announcements.manage"]),
+  MEMBER: new Set(["oc.read", "war.read", "war.payout.read", "members.read", "dashboard.read"])
 };
 
 export function hasPermission(principal: Principal, permission: string) {

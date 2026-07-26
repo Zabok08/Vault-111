@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.3.0-alpha.2.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.4.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 
@@ -15,6 +15,9 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - provides previous-sync, 24-hour, 7-day, and 30-day growth summaries from bounded snapshots;
 - lets members disable analytics and delete their stored current record and history;
 - loads the selected member's last five synchronized ranked wars only when their profile opens, then shows successful-hit categories, fixed payout points, payout-report status, and finalized pay;
+- turns the Dashboard into a shared faction overview with ranked-war, member-availability, finalized-payout, OC-slot, and data-health cards;
+- shows pinned and expiring faction announcements to every connected role;
+- lets Owner, Administrator, and Officer create, edit, pin, expire, and delete announcements through server-authorized, version-checked requests;
 - uses shared normalized crime stats in the existing local optimizer;
 - loads shared crime assignments;
 - gives backend assignments priority over local manual locks;

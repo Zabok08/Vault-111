@@ -40,6 +40,10 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(member, "members.analytics.read_all")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
+    expect(() => requirePermission(member, "dashboard.read")).not.toThrow();
+    expect(() => requirePermission(member, "announcements.manage")).toThrowError(
+      expect.objectContaining({ statusCode: 403 })
+    );
   });
 
   it("allows OC Planners to synchronize", async () => {
@@ -90,6 +94,7 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(officer, "war.notes")).not.toThrow();
     expect(() => requirePermission(officer, "war.payout.read")).not.toThrow();
     expect(() => requirePermission(officer, "war.payout.manage")).toThrow();
+    expect(() => requirePermission(officer, "announcements.manage")).not.toThrow();
     expect(() => requirePermission(officer, "war.sync")).toThrowError(
       expect.objectContaining({ statusCode: 403 })
     );
@@ -109,5 +114,6 @@ describe("server-enforced permissions", () => {
     expect(() => requirePermission(administrator, "war.payout.reopen")).not.toThrow();
     expect(() => requirePermission(administrator, "members.read")).not.toThrow();
     expect(() => requirePermission(administrator, "members.analytics.read_all")).not.toThrow();
+    expect(() => requirePermission(administrator, "announcements.manage")).not.toThrow();
   });
 });

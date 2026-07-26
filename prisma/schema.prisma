@@ -50,6 +50,8 @@ model User {
   payoutPlansUpdated WarPayoutPlan[]       @relation("WarPayoutUpdatedBy")
   payoutPlansFinalized WarPayoutPlan[]     @relation("WarPayoutFinalizedBy")
   payoutAdjustments WarPayoutAdjustment[]  @relation("WarPayoutAdjustmentUpdatedBy")
+  announcementsCreated Announcement[]      @relation("AnnouncementCreatedBy")
+  announcementsUpdated Announcement[]      @relation("AnnouncementUpdatedBy")
   auditEvents       AuditEvent[]
 
   @@index([factionId, role])
@@ -385,6 +387,25 @@ model RoleMapping {
   updatedAt       DateTime @updatedAt
 
   @@unique([factionId, factionPosition])
+}
+
+model Announcement {
+  id              String   @id @default(cuid())
+  factionId       Int
+  title           String
+  body            String
+  pinned          Boolean  @default(false)
+  expiresAt       DateTime?
+  version         Int      @default(1)
+  createdByUserId String
+  updatedByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       User     @relation("AnnouncementCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy       User     @relation("AnnouncementUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@index([factionId, pinned, createdAt])
+  @@index([factionId, expiresAt])
 }
 
 model AuditEvent {

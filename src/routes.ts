@@ -5,7 +5,12 @@ import { db } from "./db.js";
 import { config } from "./config.js";
 import { encryptSecret, newOpaqueToken, sha256 } from "./crypto.js";
 import { verifyTornIdentity } from "./torn.js";
-import { authenticate, issueAccessToken, requirePermission } from "./auth.js";
+import {
+  authenticate,
+  hasPermission,
+  issueAccessToken,
+  requirePermission
+} from "./auth.js";
 import { audit } from "./audit.js";
 import {
   readFactionCrimes,
@@ -30,6 +35,12 @@ import {
   synchronizeOwnMemberAnalytics
 } from "./memberAnalytics.js";
 import { readMemberWarHistory } from "./memberWarHistory.js";
+import {
+  createAnnouncement,
+  deleteAnnouncement,
+  readDashboardSnapshot,
+  updateAnnouncement
+} from "./dashboard.js";
 
 const loginBody = z.object({
   apiKey: z.string().trim().min(8).max(256),
@@ -61,6 +72,21 @@ const warPayoutMemberParams = warPayoutParams.extend({
 const memberHistoryParams = z.object({
   tornId: z.coerce.number().int().positive()
 });
+const announcementParams = z.object({
+  announcementId: z.string().min(1).max(128)
+});
+const announcementBody = z.object({
+  title: z.string().trim().min(3).max(120),
+  body: z.string().trim().min(1).max(2000),
+  pinned: z.boolean().default(false),
+  expiresAt: z.string().datetime().nullable().transform(value => value ? new Date(value) : null)
+});
+const announcementUpdateBody = announcementBody.extend({
+  expectedVersion: z.number().int().positive()
+});
+const announcementDeleteQuery = z.object({
+  expectedVersion: z.coerce.number().int().positive()
+});
 const warPayoutSettingsBody = z.object({
   poolAmount: z.string().regex(/^\d+$/).max(16),
   expectedVersion: z.number().int().min(0)
@@ -82,11 +108,11 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      return { ok: true, version: "3.3.0-alpha.2", database: "connected" };
+      return { ok: true, version: "3.4.0-alpha.1", database: "connected" };
     } catch {
       return reply.code(503).send({
         ok: false,
-        version: "3.3.0-alpha.2",
+        version: "3.4.0-alpha.1",
         database: "unavailable"
       });
     }
@@ -326,6 +352,91 @@ export async function registerRoutes(app: FastifyInstance) {
     requirePermission(principal, "members.read");
     const params = memberHistoryParams.parse(request.params);
     return readMemberWarHistory(principal.factionId, params.tornId);
+  });
+
+  app.get("/v1/dashboard", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "dashboard.read");
+    return readDashboardSnapshot(
+      principal.factionId,
+      hasPermission(principal, "announcements.manage")
+    );
+  });
+
+  app.post(
+    "/v1/announcements",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async request => {
+      const principal = await authenticate(request);
+      requirePermission(principal, "announcements.manage");
+      const body = announcementBody.parse(request.body);
+      const announcement = await createAnnouncement({
+        factionId: principal.factionId,
+        actorUserId: principal.id,
+        ...body
+      });
+      await audit(
+        request,
+        principal.id,
+        "announcement.create",
+        "announcement",
+        announcement.id,
+        {
+          title: announcement.title,
+          pinned: announcement.pinned,
+          expiresAt: announcement.expiresAt?.toISOString() ?? null
+        }
+      );
+      return { announcement };
+    }
+  );
+
+  app.put("/v1/announcements/:announcementId", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "announcements.manage");
+    const params = announcementParams.parse(request.params);
+    const body = announcementUpdateBody.parse(request.body);
+    const announcement = await updateAnnouncement({
+      id: params.announcementId,
+      factionId: principal.factionId,
+      actorUserId: principal.id,
+      ...body
+    });
+    await audit(
+      request,
+      principal.id,
+      "announcement.update",
+      "announcement",
+      announcement.id,
+      {
+        title: announcement.title,
+        pinned: announcement.pinned,
+        expiresAt: announcement.expiresAt?.toISOString() ?? null,
+        version: announcement.version
+      }
+    );
+    return { announcement };
+  });
+
+  app.delete("/v1/announcements/:announcementId", async request => {
+    const principal = await authenticate(request);
+    requirePermission(principal, "announcements.manage");
+    const params = announcementParams.parse(request.params);
+    const query = announcementDeleteQuery.parse(request.query);
+    await deleteAnnouncement({
+      id: params.announcementId,
+      factionId: principal.factionId,
+      expectedVersion: query.expectedVersion
+    });
+    await audit(
+      request,
+      principal.id,
+      "announcement.delete",
+      "announcement",
+      params.announcementId,
+      { expectedVersion: query.expectedVersion }
+    );
+    return { deleted: true };
   });
 
   app.get("/v1/oc/snapshot", async request => {

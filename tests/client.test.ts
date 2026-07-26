@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.3.0-alpha.2.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.4.0-alpha.1.user.js"),
   "utf8"
 );
 
@@ -114,7 +114,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.3.0-alpha.2");
+    expect(client).toContain("@version      3.4.0-alpha.1");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -134,5 +134,17 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("OOW chain");
     expect(client).toContain("Payout draft not finalized");
     expect(client).toContain("data-retry-member-history");
+  });
+
+  it("adds the unified faction dashboard and protected announcements", () => {
+    expect(client).toContain("backendApi('GET', '/v1/dashboard'");
+    expect(client).toContain("Faction overview");
+    expect(client).toContain("Latest finalized payout");
+    expect(client).toContain("Data health");
+    expect(client).toContain("id=\"v111-announcement-form\"");
+    expect(client).toContain("Publish announcement");
+    expect(client).toContain("data-edit-announcement");
+    expect(client).toContain("data-delete-announcement");
+    expect(client).toContain("Announcement messages must contain 1 to 2,000 characters.");
   });
 });
