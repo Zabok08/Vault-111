@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.2.0-alpha.1
+// @version      3.2.0-alpha.2
 // @description  Vault 111 OC planning, ranked-war tracking, target notes, and secure shared payout reports.
 // @author       Vault 111
 // @match        https://www.torn.com/*
@@ -21,7 +21,7 @@
   if (document.getElementById(INSTANCE_MARKER_ID)) return;
   const instanceMarker = document.createElement('meta');
   instanceMarker.id = INSTANCE_MARKER_ID;
-  instanceMarker.dataset.version = '3.2.0-alpha.1';
+  instanceMarker.dataset.version = '3.2.0-alpha.2';
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
