@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.1.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.2.user.js"),
   "utf8"
 );
 
@@ -40,7 +40,9 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("collapsedPosition");
     expect(client).toContain("data-drag-handle");
     expect(client).toContain("addEventListener('pointerdown'");
-    expect(client).toContain("max-height:40vh");
+    expect(client).toContain("--v111-mobile-panel-height");
+    expect(client).toContain("window.visualViewport");
+    expect(client).toContain("keyboard-open");
     expect(client).toContain("backendStatsLastAutoSync");
     expect(client).toContain("syncOwnMemberData");
     expect(client).toContain("syncBackendPersonalStats({ automatic: true })");
@@ -52,10 +54,11 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("function getScrollContainer()");
     expect(client).toContain("root?.querySelector('main')");
     expect(client).toContain("flex-direction:column !important; min-height:0 !important");
-    expect(client).toContain("position:relative !important; top:auto !important; z-index:20 !important");
+    expect(client).toContain("grid-auto-columns:minmax(0,1fr)");
     expect(client).toContain("overflow-y:auto !important; overflow-x:hidden !important");
     expect(client).toContain("grid-template-columns:repeat(2,minmax(0,1fr)) !important");
-    expect(client).toContain("@media(pointer:coarse) and (min-width:601px)");
+    expect(client).toContain("grid-template-columns:repeat(5,minmax(0,1fr))");
+    expect(client).toContain("@media(pointer:coarse) and (min-width:901px)");
   });
 
   it("uses measured flex sizing instead of clipping against assumed header heights", () => {
@@ -64,7 +67,7 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("flex:1 1 auto !important; flex-direction:column !important");
     expect(client).toContain("#v111-ocp:not(.collapsed) .body { max-height:none !important; }");
     expect(client).toContain("#v111-ocp.collapsed { width:300px !important; max-height:none !important; }");
-    expect(client).toContain("#v111-ocp.collapsed { width:min(240px,calc(100vw - 24px)) !important; max-height:none !important; }");
+    expect(client).toContain("#v111-ocp.collapsed { width:min(240px,calc(100vw - 16px)) !important; max-height:none !important; }");
     expect(client).not.toContain("max-height:calc(82vh - 48px)");
     expect(client).not.toContain("max-height:calc(40vh - 40px)");
   });
@@ -114,7 +117,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.6.0-alpha.1");
+    expect(client).toContain("@version      3.6.0-alpha.2");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -146,6 +149,18 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("data-edit-announcement");
     expect(client).toContain("data-delete-announcement");
     expect(client).toContain("Announcement messages must contain 1 to 2,000 characters.");
+    expect(client).toContain("Current chain");
+    expect(client).toContain("Your top suggested OC role");
+    expect(client).toContain("const unfilled = openSlots.length");
+    expect(client).not.toContain("Best next crime");
+    expect(client).not.toContain("Planning queue");
+  });
+
+  it("automatically synchronizes and rebuilds the planner on a rate-safe tab visit", () => {
+    expect(client).toContain("plannerLastAutoSync");
+    expect(client).toContain("PLANNER_AUTO_SYNC_INTERVAL_MS");
+    expect(client).toContain("autoSyncPlannerOnOpen()");
+    expect(client).toContain("Planner synchronized and rebuilt automatically");
   });
 
   it("adds the shared scheduler, automatic events, and member reminder preferences", () => {

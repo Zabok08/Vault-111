@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.6.0-alpha.1.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.6.0-alpha.2.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 
@@ -15,7 +15,9 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - provides previous-sync, 24-hour, 7-day, and 30-day growth summaries from bounded snapshots;
 - lets members disable analytics and delete their stored current record and history;
 - loads the selected member's last five synchronized ranked wars only when their profile opens, then shows successful-hit categories, fixed payout points, payout-report status, and finalized pay;
-- turns the Dashboard into a shared faction overview with ranked-war, member-availability, finalized-payout, OC-slot, and data-health cards;
+- turns the Dashboard into a shared faction overview with current-chain, ranked-war, member-availability, finalized-payout, OC-slot, and data-health cards;
+- counts actual empty Torn roles instead of treating local optimizer suggestions as filled slots;
+- shows the connected member's top suggested Planning/Recruiting role and removes the redundant Dashboard Planning Queue;
 - shows pinned and expiring faction announcements to every connected role;
 - lets Owner, Administrator, and Officer create, edit, pin, expire, and delete announcements through server-authorized, version-checked requests;
 - uses shared normalized crime stats in the existing local optimizer;
@@ -35,13 +37,14 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - lets Owner and Admin reopen a finalized report, with every settings, adjustment, finalize, and reopen action audited;
 - copies faction-ready payout summaries and downloads CSV reports without including access tokens or API keys;
 - keeps final payout amounts inside the planner on desktop and mobile, and links directly to Torn's faction payout controls;
-- shows a locally updating countdown to each Planning Queue crime's synchronized Torn `ready_at` time without making extra API requests.
+- synchronizes and rebuilds the plan automatically when the Planner tab opens, with a five-minute client cooldown;
 - preserves the current tab, scroll position, member search, and keyboard focus during client redraws and background synchronization;
 - exposes accessible tabs, labeled inputs, focus-managed member dialogs, live status announcements, reduced-motion behavior, and guarded loading states.
 - prevents duplicate planner instances, lets users drag and persist the collapsed launcher position, and keeps the mobile panel compact and scrollable;
+- uses the mobile visual viewport to slide above the on-screen keyboard and return to its resting position without corrupting the saved launcher position;
 - automatically synchronizes the authenticated member's approved crime and analytics stats when the API Key screen is opened, no more than once every five minutes;
 - reminds members to enter only their own key and explains that a sleeping free Render service can take about one minute to respond.
-- keeps the navigation in a separate fixed layer so scrolling tab content cannot overlap it;
+- keeps the navigation in a full-width responsive grid outside the scroller so tab content cannot overlap it;
 - uses smaller mobile typography, spacing, cards, form controls, and two-column action toolbars.
 - sizes the content area from the header's actual rendered height so the panel's bottom edge is not clipped.
 - provides a shared Schedule tab with live countdowns, event filters, and permission-aware create/edit/delete controls;

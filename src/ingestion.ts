@@ -122,6 +122,9 @@ export async function synchronizeFaction(principal: Principal) {
 
     const snapshot = await fetchFactionPlanningData(apiKey);
     const now = new Date();
+    const chainTimeoutAt = snapshot.chain.current > 0 && snapshot.chain.timeout > 0
+      ? new Date(now.getTime() + snapshot.chain.timeout * 1000)
+      : null;
 
     await db.$transaction(async transaction => {
       await transaction.factionMember.updateMany({
@@ -224,6 +227,12 @@ export async function synchronizeFaction(principal: Principal) {
           syncedByTornId: actor.tornId,
           memberCount: snapshot.members.length,
           crimeCount: snapshot.crimes.length,
+          chainCurrent: snapshot.chain.current,
+          chainMax: snapshot.chain.max,
+          chainTimeoutAt,
+          chainCooldownAt: unixDate(snapshot.chain.cooldownAt),
+          chainStartedAt: unixDate(snapshot.chain.startedAt),
+          chainEndsAt: unixDate(snapshot.chain.endsAt),
           lastError: null
         }
       });
@@ -232,7 +241,8 @@ export async function synchronizeFaction(principal: Principal) {
     return {
       syncedAt: now,
       members: snapshot.members.length,
-      crimes: snapshot.crimes.length
+      crimes: snapshot.crimes.length,
+      chain: snapshot.chain.current
     };
   } catch (error) {
     await db.factionSyncState.update({

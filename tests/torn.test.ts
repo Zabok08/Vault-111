@@ -95,6 +95,31 @@ describe("Torn faction planning data", () => {
       checkpoint_pass_rate: null
     });
   });
+
+  it("normalizes the current faction chain for dashboard countdowns", async () => {
+    const { parseFactionOngoingChain } = await import("../src/torn.js");
+    expect(parseFactionOngoingChain({
+      chain: {
+        id: 800,
+        current: 37,
+        max: 100,
+        timeout: 275,
+        modifier: 1.5,
+        cooldown: 0,
+        start: 1_700_000_000,
+        end: 0
+      }
+    })).toEqual({
+      id: 800,
+      current: 37,
+      max: 100,
+      timeout: 275,
+      modifier: 1.5,
+      cooldownAt: null,
+      startedAt: 1_700_000_000,
+      endsAt: null
+    });
+  });
 });
 
 describe("Torn personal crime stats", () => {

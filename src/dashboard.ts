@@ -180,7 +180,13 @@ export async function readDashboardSnapshot(
         inProgressAt: true,
         lastError: true,
         memberCount: true,
-        crimeCount: true
+        crimeCount: true,
+        chainCurrent: true,
+        chainMax: true,
+        chainTimeoutAt: true,
+        chainCooldownAt: true,
+        chainStartedAt: true,
+        chainEndsAt: true
       }
     }),
     db.warSyncState.findUnique({
@@ -245,6 +251,17 @@ export async function readDashboardSnapshot(
     },
     members: summarizeDashboardMembers(members, now.getTime()),
     crimes: summarizeDashboardCrimes(crimes, now.getTime()),
+    chain: factionSync
+      ? {
+          current: factionSync.chainCurrent,
+          max: factionSync.chainMax,
+          timeoutAt: factionSync.chainTimeoutAt,
+          cooldownAt: factionSync.chainCooldownAt,
+          startedAt: factionSync.chainStartedAt,
+          endsAt: factionSync.chainEndsAt,
+          syncedAt: factionSync.lastSuccessAt
+        }
+      : null,
     war,
     payout: payout
       ? {
@@ -262,10 +279,12 @@ export async function readDashboardSnapshot(
     sync: {
       faction: factionSync
         ? {
-            ...factionSync,
+            lastAttemptAt: factionSync.lastAttemptAt,
+            lastSuccessAt: factionSync.lastSuccessAt,
             lastError: factionSync.lastError ? "Last faction sync attempt failed" : null,
             inProgress: Boolean(factionSync.inProgressAt),
-            inProgressAt: undefined
+            memberCount: factionSync.memberCount,
+            crimeCount: factionSync.crimeCount
           }
         : null,
       war: warSync

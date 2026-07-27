@@ -120,6 +120,21 @@ const factionCrimesResponseSchema = z.object({
   crimes: z.array(factionCrimeSchema).max(100)
 }).passthrough();
 
+const factionOngoingChainSchema = z.object({
+  id: z.number().int().nonnegative(),
+  current: z.number().int().nonnegative(),
+  max: z.number().int().nonnegative(),
+  timeout: z.number().int().nonnegative(),
+  modifier: z.number().finite().nonnegative(),
+  cooldown: timestampSchema,
+  start: timestampSchema,
+  end: timestampSchema
+}).passthrough();
+
+const factionOngoingChainResponseSchema = z.object({
+  chain: factionOngoingChainSchema
+}).passthrough();
+
 const crimeStatNameSchema = z.string().regex(/^[a-z0-9_]{1,64}$/);
 const crimeStatValueSchema = z.number().finite().nonnegative();
 const crimeStatBucketSchema = z.record(crimeStatNameSchema, crimeStatValueSchema);
@@ -322,6 +337,20 @@ export function parseFactionCrimes(value: unknown) {
   }));
 }
 
+export function parseFactionOngoingChain(value: unknown) {
+  const { chain } = factionOngoingChainResponseSchema.parse(value);
+  return {
+    id: chain.id,
+    current: chain.current,
+    max: chain.max,
+    timeout: chain.timeout,
+    modifier: chain.modifier,
+    cooldownAt: chain.cooldown || null,
+    startedAt: chain.start || null,
+    endsAt: chain.end || null
+  };
+}
+
 function sumSelected(record: Record<string, number>, names: string[]) {
   return names.reduce((total, name) => total + Number(record[name] || 0), 0);
 }
@@ -503,14 +532,16 @@ export function parseFactionAttacks(
 }
 
 export async function fetchFactionPlanningData(apiKey: string) {
-  const [membersResponse, crimesResponse] = await Promise.all([
+  const [membersResponse, crimesResponse, chainResponse] = await Promise.all([
     tornGet<unknown>("/faction/members", apiKey),
-    tornGet<unknown>("/faction/crimes?cat=available&limit=100", apiKey)
+    tornGet<unknown>("/faction/crimes?cat=available&limit=100", apiKey),
+    tornGet<unknown>("/faction/chain", apiKey)
   ]);
   try {
     return {
       members: parseFactionMembers(membersResponse),
-      crimes: parseFactionCrimes(crimesResponse)
+      crimes: parseFactionCrimes(crimesResponse),
+      chain: parseFactionOngoingChain(chainResponse)
     };
   } catch (error) {
     if (error instanceof z.ZodError) {

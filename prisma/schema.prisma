@@ -129,16 +129,22 @@ model FactionMember {
 }
 
 model FactionSyncState {
-  factionId      Int       @id
-  lastAttemptAt  DateTime?
-  lastSuccessAt  DateTime?
-  inProgressAt   DateTime?
-  syncedByTornId Int?
-  memberCount    Int       @default(0)
-  crimeCount     Int       @default(0)
-  lastError      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  factionId       Int       @id
+  lastAttemptAt   DateTime?
+  lastSuccessAt   DateTime?
+  inProgressAt    DateTime?
+  syncedByTornId  Int?
+  memberCount     Int       @default(0)
+  crimeCount      Int       @default(0)
+  chainCurrent    Int       @default(0)
+  chainMax        Int       @default(0)
+  chainTimeoutAt  DateTime?
+  chainCooldownAt DateTime?
+  chainStartedAt  DateTime?
+  chainEndsAt     DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model RankedWar {
