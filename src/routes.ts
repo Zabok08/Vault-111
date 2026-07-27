@@ -168,11 +168,11 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/health", async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      return { ok: true, version: "3.6.0-alpha.2", database: "connected" };
+      return { ok: true, version: "3.6.0-alpha.3", database: "connected" };
     } catch {
       return reply.code(503).send({
         ok: false,
-        version: "3.6.0-alpha.2",
+        version: "3.6.0-alpha.3",
         database: "unavailable"
       });
     }

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.2.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.3.user.js"),
   "utf8"
 );
 
@@ -117,7 +117,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.6.0-alpha.2");
+    expect(client).toContain("@version      3.6.0-alpha.3");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -161,6 +161,16 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("PLANNER_AUTO_SYNC_INTERVAL_MS");
     expect(client).toContain("autoSyncPlannerOnOpen()");
     expect(client).toContain("Planner synchronized and rebuilt automatically");
+  });
+
+  it("mounts and recovers across Torn mobile routes and stale userscript instances", () => {
+    expect(client).toContain("// @match        https://*.torn.com/*");
+    expect(client).toContain("params.get('sid')");
+    expect(client).toContain("params.get('route')");
+    expect(client).toContain("existingMarker && existingPanel");
+    expect(client).toContain("existingMarker?.remove()");
+    expect(client).toContain("function ensurePanelVisible()");
+    expect(client).toContain("window.addEventListener('pageshow'");
   });
 
   it("adds the shared scheduler, automatic events, and member reminder preferences", () => {

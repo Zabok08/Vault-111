@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.6.0-alpha.2.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.6.0-alpha.3.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 
@@ -42,6 +42,8 @@ The planner and optimizer remain available. The old local key manager and pre-re
 - exposes accessible tabs, labeled inputs, focus-managed member dialogs, live status announcements, reduced-motion behavior, and guarded loading states.
 - prevents duplicate planner instances, lets users drag and persist the collapsed launcher position, and keeps the mobile panel compact and scrollable;
 - uses the mobile visual viewport to slide above the on-screen keyboard and return to its resting position without corrupting the saved launcher position;
+- recognizes direct and routed Torn faction URLs across the bare domain and Torn subdomains;
+- replaces stale older singleton instances and recovers a mobile launcher if its saved position is no longer visible;
 - automatically synchronizes the authenticated member's approved crime and analytics stats when the API Key screen is opened, no more than once every five minutes;
 - reminds members to enter only their own key and explains that a sleeping free Render service can take about one minute to respond.
 - keeps the navigation in a full-width responsive grid outside the scroller so tab content cannot overlap it;
