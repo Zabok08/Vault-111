@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.2
+// @version      3.6.0-alpha.3
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
 // @match        https://www.torn.com/*
+// @match        https://torn.com/*
+// @match        https://*.torn.com/*
 // @connect      vault111-control-center.onrender.com
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -18,11 +20,21 @@
 (() => {
   'use strict';
 
+  const CLIENT_VERSION = '3.6.0-alpha.3';
   const INSTANCE_MARKER_ID = 'v111-control-center-singleton';
-  if (document.getElementById(INSTANCE_MARKER_ID)) return;
+  const existingMarker = document.getElementById(INSTANCE_MARKER_ID);
+  const existingPanel = document.getElementById('v111-ocp');
+  if (existingMarker && existingPanel && existingMarker.dataset.version === CLIENT_VERSION) return;
+  if (existingMarker && existingPanel) existingPanel.remove();
+  if (existingMarker && !existingPanel) {
+    const startedAt = Number(existingMarker.dataset.startedAt || 0);
+    if (startedAt && Date.now() - startedAt < 10_000) return;
+  }
+  existingMarker?.remove();
   const instanceMarker = document.createElement('meta');
   instanceMarker.id = INSTANCE_MARKER_ID;
-  instanceMarker.dataset.version = '3.6.0-alpha.2';
+  instanceMarker.dataset.version = CLIENT_VERSION;
+  instanceMarker.dataset.startedAt = String(Date.now());
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
@@ -117,6 +129,16 @@
   restoreBackendSession();
   window.addEventListener('hashchange', syncMountToPage);
   window.addEventListener('popstate', syncMountToPage);
+  window.addEventListener('pageshow', () => {
+    syncMountToPage();
+    ensurePanelVisible();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      syncMountToPage();
+      ensurePanelVisible();
+    }
+  });
   window.addEventListener('resize', () => syncMobileViewport());
   window.visualViewport?.addEventListener('resize', () => syncMobileViewport());
   window.visualViewport?.addEventListener('scroll', () => syncMobileViewport());
@@ -136,21 +158,36 @@
   setInterval(checkScheduleReminders, 30000);
 
   function isFactionPage() {
-    return /\/factions\.php$/i.test(location.pathname);
+    const path = location.pathname.toLowerCase().replace(/\/+$/, '');
+    if (/\/factions?\.php$/.test(path) || /\/factions?$/.test(path)) return true;
+    const params = new URLSearchParams(location.search);
+    const routeHint = [
+      params.get('sid'),
+      params.get('page'),
+      params.get('section'),
+      params.get('route')
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (/(^|[^a-z])factions?([^a-z]|$)/.test(routeHint)) return true;
+    return /(^|[#/])factions?(?:[/=&]|$)/i.test(location.hash);
   }
 
   function syncMountToPage() {
     if (isFactionPage() && !dismissedUntilReload) {
       const existingRoot = document.getElementById('v111-ocp');
-      if (existingRoot && existingRoot !== root) return;
+      if (existingRoot && existingRoot !== root) {
+        if (existingRoot.dataset.v111Version === CLIENT_VERSION) return;
+        existingRoot.remove();
+      }
       if (!root || !root.isConnected) {
         root = document.createElement('section');
         root.id = 'v111-ocp';
+        root.dataset.v111Version = CLIENT_VERSION;
         root.setAttribute('role', 'region');
         root.setAttribute('aria-label', 'Vault 111 Control Center');
-        document.body.appendChild(root);
+        (document.body || document.documentElement).appendChild(root);
         render();
         syncMobileViewport(true);
+        ensurePanelVisible();
       }
     } else if (root?.isConnected) {
       state.ui.modalMemberId = null;
@@ -212,6 +249,42 @@
     if (state.settings.collapsed) applyCollapsedPosition();
   }
 
+  function ensurePanelVisible() {
+    if (!root?.isConnected || !usesMobileLayout()) return;
+    requestAnimationFrame(() => {
+      if (!root?.isConnected) return;
+      const viewport = window.visualViewport;
+      const left = Math.max(0, Number(viewport?.offsetLeft || 0));
+      const top = Math.max(0, Number(viewport?.offsetTop || 0));
+      const right = left + Math.max(1, Number(viewport?.width || window.innerWidth));
+      const bottom = top + Math.max(1, Number(viewport?.height || window.innerHeight));
+      const rect = root.getBoundingClientRect();
+      const intersects =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.right > left &&
+        rect.left < right &&
+        rect.bottom > top &&
+        rect.top < bottom;
+      if (intersects) return;
+
+      stableMobileViewportHeight = Math.max(1, Number(viewport?.height || window.innerHeight));
+      if (state.settings.collapsed) {
+        state.settings.collapsedPosition = {
+          left: Math.max(left + 8, right - Math.max(1, root.offsetWidth || 240) - 8),
+          top: Math.max(top + 8, top + (bottom - top - Math.max(1, root.offsetHeight || 48)) / 2)
+        };
+        save(STORE.settings, state.settings);
+        applyCollapsedPosition(true);
+      } else {
+        for (const property of ['left', 'top', 'right', 'bottom', 'transform']) {
+          root.style.removeProperty(property);
+        }
+        syncMobileViewport(true);
+      }
+    });
+  }
+
   function render() {
     if (!root || !root.isConnected) return;
     const renderedTab = root.querySelector('[role="tab"][aria-selected="true"]')?.dataset.tab;
@@ -234,7 +307,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.2 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6 alpha.3 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
@@ -4285,7 +4358,7 @@
       #v111-ocp .payout-adjustment .negative { color:#ff9ea7 !important; }
       #v111-ocp .payout-final { color:#f2c94c !important; font-size:12px !important; }
       @media(max-width:700px), (pointer:coarse) and (max-width:900px) {
-        #v111-ocp:not(.collapsed) { right:3vw !important; left:auto !important; top:var(--v111-mobile-panel-top,30vh) !important; bottom:auto !important; transform:none !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40svh) !important; font-size:12px !important; }
+        #v111-ocp:not(.collapsed) { right:3vw !important; left:auto !important; top:var(--v111-mobile-panel-top,30vh) !important; bottom:auto !important; transform:none !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40vh) !important; font-size:12px !important; }
         #v111-ocp.keyboard-open:not(.collapsed) { box-shadow:0 8px 34px rgba(0,0,0,.82) !important; }
         #v111-ocp:not(.collapsed) .body { max-height:none !important; }
         #v111-ocp.collapsed { width:min(240px,calc(100vw - 16px)) !important; max-height:none !important; }
@@ -4687,7 +4760,7 @@
         #v111-ocp .member-tags { justify-content:flex-start !important; }
         #v111-ocp .queue-row { align-items:flex-start !important; }
         #v111-ocp .queue-right { align-items:flex-end !important; flex-direction:column !important; }
-        #v111-ocp .member-modal { right:3vw !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40svh) !important; padding:7px !important; font-size:10px !important; }
+        #v111-ocp .member-modal { right:3vw !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40vh) !important; padding:7px !important; font-size:10px !important; }
         #v111-ocp .profile-status { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-analytics-section { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-history-section { margin:5px 0 !important; padding:5px !important; }
