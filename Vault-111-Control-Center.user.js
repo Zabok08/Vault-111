@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.1
+// @version      3.6.0-alpha.2
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
 // @match        https://www.torn.com/*
@@ -22,7 +22,7 @@
   if (document.getElementById(INSTANCE_MARKER_ID)) return;
   const instanceMarker = document.createElement('meta');
   instanceMarker.id = INSTANCE_MARKER_ID;
-  instanceMarker.dataset.version = '3.6.0-alpha.1';
+  instanceMarker.dataset.version = '3.6.0-alpha.2';
   (document.head || document.documentElement).appendChild(instanceMarker);
 
   // Replace this value and the matching @connect entry with the HTTPS production host before faction-wide release.
@@ -35,9 +35,11 @@
     backendRefresh: 'v111_v3_refresh_token',
     backendExpires: 'v111_v3_access_expires_at',
     backendStatsLastAutoSync: 'v111_v3_stats_last_auto_sync',
+    plannerLastAutoSync: 'v111_v3_planner_last_auto_sync',
     scheduleNotificationLog: 'v111_v3_schedule_notification_log'
   };
   const STATS_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+  const PLANNER_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
   const CRIME_URL = 'https://www.torn.com/factions.php?step=your&type=1#/tab=crimes';
   const WAR_URL = 'https://www.torn.com/factions.php?step=your&type=1#/tab=war/rank';
   const FACTION_PAYOUT_URL = 'https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user';
@@ -108,13 +110,22 @@
   let modalReturnFocusKey = null;
   let backendAwakeUntil = 0;
   let backendWakePromise = null;
+  let stableMobileViewportHeight = 0;
 
   syncMountToPage();
   configureAutoRefresh();
   restoreBackendSession();
   window.addEventListener('hashchange', syncMountToPage);
   window.addEventListener('popstate', syncMountToPage);
-  window.addEventListener('resize', () => applyCollapsedPosition(true));
+  window.addEventListener('resize', () => syncMobileViewport());
+  window.visualViewport?.addEventListener('resize', () => syncMobileViewport());
+  window.visualViewport?.addEventListener('scroll', () => syncMobileViewport());
+  document.addEventListener('focusin', event => {
+    if (root?.contains(event.target)) setTimeout(() => syncMobileViewport(), 60);
+  });
+  document.addEventListener('focusout', event => {
+    if (root?.contains(event.target)) setTimeout(() => syncMobileViewport(), 300);
+  });
   setInterval(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
@@ -125,7 +136,7 @@
   setInterval(checkScheduleReminders, 30000);
 
   function isFactionPage() {
-    return /^\/factions\.php$/i.test(location.pathname);
+    return /\/factions\.php$/i.test(location.pathname);
   }
 
   function syncMountToPage() {
@@ -139,6 +150,7 @@
         root.setAttribute('aria-label', 'Vault 111 Control Center');
         document.body.appendChild(root);
         render();
+        syncMobileViewport(true);
       }
     } else if (root?.isConnected) {
       state.ui.modalMemberId = null;
@@ -150,6 +162,54 @@
 
   function getScrollContainer() {
     return root?.querySelector('main') || root?.querySelector('#v111-body');
+  }
+
+  function usesMobileLayout() {
+    return window.matchMedia?.('(max-width:700px), (pointer:coarse) and (max-width:900px)').matches ?? false;
+  }
+
+  function isPlannerEditor(element) {
+    return element instanceof Element &&
+      root?.contains(element) &&
+      Boolean(element.matches('input, textarea, select, [contenteditable="true"]'));
+  }
+
+  function syncMobileViewport(forceStable = false) {
+    if (!root?.isConnected) return;
+    const viewport = window.visualViewport;
+    const height = Math.max(1, Number(viewport?.height || window.innerHeight || 1));
+    const offsetTop = Math.max(0, Number(viewport?.offsetTop || 0));
+    const mobile = usesMobileLayout();
+    if (!mobile) {
+      stableMobileViewportHeight = height;
+      root.classList.remove('keyboard-open');
+      for (const property of ['--v111-mobile-panel-height', '--v111-mobile-panel-top', '--v111-visual-height']) {
+        root.style.removeProperty(property);
+      }
+      if (state.settings.collapsed) applyCollapsedPosition();
+      return;
+    }
+
+    const editorFocused = isPlannerEditor(document.activeElement);
+    if (
+      forceStable ||
+      !stableMobileViewportHeight ||
+      (!editorFocused && height >= stableMobileViewportHeight * 0.8)
+    ) {
+      stableMobileViewportHeight = height;
+    }
+    const keyboardOpen =
+      editorFocused &&
+      stableMobileViewportHeight - height >= Math.max(100, stableMobileViewportHeight * 0.18);
+    const restingPanelHeight = Math.max(220, Math.min(420, stableMobileViewportHeight * 0.4));
+    const visiblePanelHeight = Math.min(restingPanelHeight, Math.max(180, height - 12));
+    const top = offsetTop + Math.max(6, (height - visiblePanelHeight) / 2);
+
+    root.classList.toggle('keyboard-open', keyboardOpen);
+    root.style.setProperty('--v111-mobile-panel-height', `${Math.round(visiblePanelHeight)}px`);
+    root.style.setProperty('--v111-mobile-panel-top', `${Math.round(top)}px`);
+    root.style.setProperty('--v111-visual-height', `${Math.round(height)}px`);
+    if (state.settings.collapsed) applyCollapsedPosition();
   }
 
   function render() {
@@ -174,7 +234,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.1 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6 alpha.2 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
@@ -283,6 +343,7 @@
       <div id="v111-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>`;
 
     applyCollapsedPosition();
+    syncMobileViewport();
     bindEvents();
     applyMemberSearch();
     applyWarTargetFilter();
@@ -299,14 +360,14 @@
     const planning = plans.filter(isPlanningCrime);
     const openSlots = planning.flatMap(c => c.slots).filter(s => !s.existing);
     const filled = openSlots.filter(s => s.assigned);
-    const unfilled = openSlots.filter(s => !s.assigned).length;
+    // Optimizer suggestions do not fill a Torn slot. Count every role that is actually empty there.
+    const unfilled = openSlots.length;
     const readinessValues = planning.map(crimeReadiness);
     const avgReadiness = readinessValues.length ? Math.round(readinessValues.reduce((a,b)=>a+b,0) / readinessValues.length) : 0;
     const ready = readinessValues.filter(v => v >= 80).length;
     const occupied = members.filter(m => m.isInOc).length;
     const available = members.filter(m => m.apiStatus === 'ok' && !m.isInOc).length;
-    const bestIndex = readinessValues.length ? readinessValues.indexOf(Math.max(...readinessValues)) : -1;
-    return { planning: planning.length, openRoles: openSlots.length, filled: filled.length, unfilled, avgReadiness, ready, occupied, available, bestCrime: bestIndex >= 0 ? planning[bestIndex] : null };
+    return { planning: planning.length, openRoles: openSlots.length, filled: filled.length, unfilled, avgReadiness, ready, occupied, available };
   }
 
   function announcementDateInput(value) {
@@ -720,6 +781,7 @@
     const war = snapshot.war;
     const members = snapshot.members || {};
     const crimes = snapshot.crimes || {};
+    const chain = snapshot.chain;
     const payout = snapshot.payout;
     const factionSync = snapshot.sync?.faction;
     const warSync = snapshot.sync?.war;
@@ -737,6 +799,19 @@
             <b>${formatNumber(war.factionScore)} – ${formatNumber(war.opponentScore)}</b>
             <span data-dashboard-war-countdown>${esc(warCountdownLabel(war))}</span>
           ` : '<h4>No synchronized war</h4><span>Open the War tab for synchronization controls.</span>'}
+          <button class="mini" data-jump="war">Open War</button>
+        </article>
+        <article class="overview-card chain">
+          <small>Current chain</small>
+          ${Number(chain?.current || 0) > 0 ? `
+            <h4>${formatNumber(chain.current)} hit${Number(chain.current) === 1 ? '' : 's'}</h4>
+            <b>${formatNumber(chain.current)} / ${formatNumber(Math.max(Number(chain.max || 0), Number(chain.current || 0)))}</b>
+            <span data-dashboard-chain-countdown>${esc(chainCountdownLabel(chain))}</span>
+          ` : `
+            <h4>No active chain</h4>
+            <b>${Number(chain?.max || 0) ? `Last count ${formatNumber(chain.max)}` : 'Waiting for faction sync'}</b>
+            <span data-dashboard-chain-countdown>${esc(chainCountdownLabel(chain))}</span>
+          `}
           <button class="mini" data-jump="war">Open War</button>
         </article>
         <article class="overview-card members">
@@ -774,7 +849,7 @@
   }
 
   function renderDashboard(metrics, plans) {
-    const queue = plans.filter(isPlanningCrime).sort((a,b) => crimeReadiness(b) - crimeReadiness(a));
+    const suggestedRole = getMyTopSuggestedRole(plans);
     return `
       ${renderUnifiedDashboard(state.backend.dashboardSnapshot)}
       ${renderDashboardAnnouncements(state.backend.dashboardSnapshot)}
@@ -784,7 +859,7 @@
         <div class="metric"><b>${metrics.planning}</b><span>Planning crimes</span></div>
         <div class="metric"><b>${metrics.ready}</b><span>Strong / ready</span></div>
         <div class="metric"><b>${metrics.available}</b><span>Available with stats</span></div>
-        <div class="metric"><b>${metrics.unfilled}</b><span>Unfilled roles</span></div>
+        <div class="metric"><b>${metrics.unfilled}</b><span>Torn roles unfilled</span></div>
         <div class="metric wide"><b>${metrics.avgReadiness}%</b><span>Average readiness</span></div>
       </div>
       <div class="dashboard-actions toolbar">
@@ -793,20 +868,7 @@
         <button data-act="export">Copy Plan</button>
       </div>
       ${renderStatusRegion('v111-dashboard-status', state.ui.dashboardStatus)}
-      ${metrics.bestCrime ? renderBestNextCrime(metrics.bestCrime) : ''}
-      <h3 class="section-title">Planning queue</h3>
-      <div class="queue-list">${queue.length ? queue.map(c => {
-        const ready = crimeReadiness(c);
-        const missing = c.slots.filter(s => !s.existing && !s.assigned).length;
-        const readyAt = timestampMs(c.readyAt);
-        return `<button class="queue-row" data-jump-crime="${esc(c.id)}">
-          <span><b>${esc(c.name)}</b><small>${missing ? `${missing} missing role${missing === 1 ? '' : 's'}` : 'Crew filled'}</small></span>
-          <span class="queue-right">
-            <span class="queue-timer ${readyAt && readyAt <= Date.now() ? 'ready' : ''}" data-ready-at="${readyAt || 0}" aria-live="off" title="${readyAt ? `Ready ${esc(new Date(readyAt).toLocaleString())}` : 'Ready time unavailable'}">${formatCrimeCountdown(readyAt)}</span>
-            <span class="queue-score ${readinessClass(ready)}">${ready}%</span>
-          </span>
-        </button>`;
-      }).join('') : '<div class="empty">No planning-stage crimes found.</div>'}</div>`;
+      ${renderMySuggestedRole(suggestedRole)}`;
   }
 
   function timestampMs(value) {
@@ -836,6 +898,10 @@
       element.classList.toggle('ready', Boolean(readyAt && readyAt <= Date.now()));
     });
     updateWarCountdowns();
+    const chainCountdown = root.querySelector('[data-dashboard-chain-countdown]');
+    if (chainCountdown) {
+      chainCountdown.textContent = chainCountdownLabel(state.backend.dashboardSnapshot?.chain);
+    }
     root.querySelectorAll('[data-event-countdown]').forEach(element => {
       const event = state.backend.scheduleSnapshot?.events?.find(
         candidate => String(candidate.id) === String(element.dataset.eventCountdown)
@@ -845,12 +911,76 @@
   }
 
 
-  function renderBestNextCrime(crime) {
-    const readiness = crimeReadiness(crime);
-    return `<div class="highlight-card">
-      <small>Best next crime</small>
-      <div class="highlight-title"><h3>${esc(crime.name)}</h3><span class="readiness-badge ${readinessClass(readiness)}">${readiness}%</span></div>
-      <div class="toolbar"><a class="button primary" href="${esc(crime.url)}" target="_blank" rel="noopener">Open Crime</a><button data-jump-crime="${esc(crime.id)}">View in Planner</button></div>
+  function chainCountdownLabel(chain) {
+    if (!chain) return 'Synchronize faction data to load the chain.';
+    const cooldownAt = timestampMs(chain.cooldownAt);
+    if (cooldownAt > Date.now()) return `Cooldown ${eventCountdown(cooldownAt).toLowerCase()}`;
+    const timeoutAt = timestampMs(chain.timeoutAt);
+    if (Number(chain.current || 0) > 0 && timeoutAt > Date.now()) {
+      return `${eventCountdown(timeoutAt).replace('Starts in ', '')} until the chain breaks`;
+    }
+    if (Number(chain.current || 0) > 0) return 'Chain timer expired; synchronize for the latest state.';
+    return 'No chain is currently active.';
+  }
+
+  function getMyTopSuggestedRole(plans) {
+    const ownId = Number(state.backend.user?.tornId || 0);
+    if (!ownId) return { reason: 'Connect your own API key to see your top suggested OC role.' };
+    const member = (state.cache.members || []).find(candidate => Number(candidate.id) === ownId);
+    if (!member || member.apiStatus !== 'ok') {
+      return { reason: 'Synchronize your stats to calculate your top suggested OC role.' };
+    }
+
+    const existing = plans.flatMap(crime =>
+      crime.slots
+        .filter(slot => slot.existing && Number(slot.assigned?.id || slot.userId || 0) === ownId)
+        .map(slot => ({ crime, slot, current: true, score: Number(slot.score || 0), rank: 1 }))
+    ).sort((a, b) => b.score - a.score)[0];
+    if (existing) return existing;
+    if (member.isInOc) {
+      return { reason: 'You are already assigned to an OC in Torn. Your next recommendation will appear when you become available.' };
+    }
+
+    const suggestions = [];
+    for (const crime of plans) {
+      const status = String(crime.status || '').toLowerCase();
+      if (!status.includes('planning') && !status.includes('recruit')) continue;
+      for (const slot of crime.slots) {
+        if (slot.existing) continue;
+        const detail = roleScoreDetailed(member, slot, crime);
+        const candidateRank = (slot.candidatePool || []).findIndex(candidate => Number(candidate.id) === ownId);
+        suggestions.push({
+          crime,
+          slot,
+          current: false,
+          score: detail.score,
+          rank: candidateRank >= 0 ? candidateRank + 1 : null
+        });
+      }
+    }
+    return suggestions.sort((a, b) => b.score - a.score)[0] || {
+      reason: 'No open Planning or Recruiting role is available for a recommendation.'
+    };
+  }
+
+  function renderMySuggestedRole(suggestion) {
+    if (!suggestion?.crime || !suggestion?.slot) {
+      return `<div class="highlight-card suggested-role-card">
+        <small>Your top suggested OC role</small>
+        <div class="highlight-title"><h3>Not available yet</h3></div>
+        <p>${esc(suggestion?.reason || 'Synchronize the planner to calculate your recommendation.')}</p>
+        <div class="toolbar"><button data-jump="plan">Open Planner</button><button data-jump="backend">Open API Key</button></div>
+      </div>`;
+    }
+    const readiness = crimeReadiness(suggestion.crime);
+    return `<div class="highlight-card suggested-role-card">
+      <small>${suggestion.current ? 'Your current OC role' : 'Your top suggested OC role'}</small>
+      <div class="highlight-title"><h3>${esc(suggestion.slot.role)}</h3><span class="readiness-badge ${readinessClass(readiness)}">${readiness}% crime readiness</span></div>
+      <b>${esc(suggestion.crime.name)}</b>
+      <p>${suggestion.current
+        ? 'This is your confirmed assignment in Torn.'
+        : `${suggestion.rank ? `Ranked #${suggestion.rank} for this role. ` : ''}This is your strongest statistical fit across open Planning and Recruiting roles.`}</p>
+      <div class="toolbar"><a class="button primary" href="${esc(suggestion.crime.url)}" target="_blank" rel="noopener">Open Crime</a><button data-jump-crime="${esc(suggestion.crime.id)}">View in Planner</button></div>
     </div>`;
   }
 
@@ -1710,11 +1840,18 @@
     const margin = 8;
     const width = Math.max(1, root.offsetWidth || 300);
     const height = Math.max(1, root.offsetHeight || 48);
-    const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-    const maxTop = Math.max(margin, window.innerHeight - height - margin);
+    const viewport = usesMobileLayout() ? window.visualViewport : null;
+    const offsetLeft = Math.max(0, Number(viewport?.offsetLeft || 0));
+    const offsetTop = Math.max(0, Number(viewport?.offsetTop || 0));
+    const viewportWidth = Math.max(1, Number(viewport?.width || window.innerWidth));
+    const viewportHeight = Math.max(1, Number(viewport?.height || window.innerHeight));
+    const minLeft = offsetLeft + margin;
+    const minTop = offsetTop + margin;
+    const maxLeft = Math.max(minLeft, offsetLeft + viewportWidth - width - margin);
+    const maxTop = Math.max(minTop, offsetTop + viewportHeight - height - margin);
     return {
-      left: Math.round(Math.min(maxLeft, Math.max(margin, Number(position?.left) || margin))),
-      top: Math.round(Math.min(maxTop, Math.max(margin, Number(position?.top) || margin)))
+      left: Math.round(Math.min(maxLeft, Math.max(minLeft, Number(position?.left) || minLeft))),
+      top: Math.round(Math.min(maxTop, Math.max(minTop, Number(position?.top) || minTop)))
     };
   }
 
@@ -1726,12 +1863,14 @@
     }
     const position = clampCollapsedPosition(state.settings.collapsedPosition);
     if (!position) return;
-    state.settings.collapsedPosition = position;
     root.style.setProperty('left', `${position.left}px`, 'important');
     root.style.setProperty('top', `${position.top}px`, 'important');
     root.style.setProperty('right', 'auto', 'important');
     root.style.setProperty('transform', 'none', 'important');
-    if (persist) save(STORE.settings, state.settings);
+    if (persist) {
+      state.settings.collapsedPosition = position;
+      save(STORE.settings, state.settings);
+    }
   }
 
   function moveCollapsedPlanner(left, top, persist = false) {
@@ -2042,6 +2181,11 @@
     });
     if (scroller) scroller.scrollTop = Number(state.ui.scrollByTab[tab] || 0);
     if (focusTab) root.querySelector(`[data-tab="${CSS.escape(tab)}"]`)?.focus();
+    if (tab === 'plan') {
+      setTimeout(() => {
+        if (state.ui.activeTab === 'plan') autoSyncPlannerOnOpen();
+      }, 0);
+    }
     if (tab === 'dashboard' && state.backend.connected && !state.backend.dashboardSnapshot) {
       setTimeout(() => {
         if (state.ui.activeTab === 'dashboard') refreshDashboard(true);
@@ -2207,6 +2351,16 @@
     autoRefreshTimer = setInterval(() => {
       if (isFactionPage() && state.backend.connected && !document.hidden) syncAll(true);
     }, minutes * 60 * 1000);
+  }
+
+  function plannerAutoSyncDue() {
+    const lastSync = Number(load(STORE.plannerLastAutoSync, 0) || 0);
+    return !lastSync || Date.now() - lastSync >= PLANNER_AUTO_SYNC_INTERVAL_MS;
+  }
+
+  async function autoSyncPlannerOnOpen() {
+    if (!state.backend.connected || state.backend.loading || !plannerAutoSyncDue()) return;
+    await syncBackendFaction(false, false, true);
   }
 
   async function syncAll(silent = false) {
@@ -3645,7 +3799,7 @@
     }
   }
 
-  async function syncBackendFaction(silent = false, returnToBackend = false) {
+  async function syncBackendFaction(silent = false, returnToBackend = false, plannerAutomatic = false) {
     if (state.backend.loading) return;
     const returnTab = returnToBackend ? 'backend' : state.ui.activeTab;
     const label = backendCanSync() ? 'Synchronizing Vault 111 from Torn…' : 'Refreshing shared faction data…';
@@ -3661,13 +3815,19 @@
       await loadScheduleSnapshot();
       const memberCount = Number(result?.sync?.memberCount || result?.members?.length || 0);
       const crimeCount = Number(result?.sync?.crimeCount || result?.crimes?.length || 0);
+      if (returnTab === 'plan') save(STORE.plannerLastAutoSync, Date.now());
+      if (plannerAutomatic) {
+        setFeedback('planner', `Planner synchronized and rebuilt automatically: ${memberCount} members and ${crimeCount} available crimes.`);
+      }
       if (!silent) {
         const warning = synced?.analyticsResult?.warnings?.join(' ');
-        setFeedback(returnTab, `${warning ? `${warning} ` : ''}Your member stats were updated. Shared data loaded: ${memberCount} members and ${crimeCount} available crimes.`);
+        if (!plannerAutomatic) {
+          setFeedback(returnTab, `${warning ? `${warning} ` : ''}Your member stats were updated. Shared data loaded: ${memberCount} members and ${crimeCount} available crimes.`);
+        }
       }
     } catch (error) {
       state.backend.error = friendly(error);
-      if (!silent) setFeedback(returnTab, state.backend.error, true);
+      if (!silent) setFeedback(plannerAutomatic ? 'planner' : returnTab, state.backend.error, true);
     } finally {
       finishBackendWork();
       state.ui.activeTab = returnTab;
@@ -3910,6 +4070,9 @@
         text-align: left !important;
         overflow: hidden !important;
         isolation: isolate !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transition: top .2s ease, transform .2s ease, max-height .2s ease !important;
       }
       #v111-ocp, #v111-ocp * { box-sizing: border-box !important; }
       #v111-ocp .sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
@@ -3969,8 +4132,8 @@
       #v111-ocp .body { display:flex !important; flex:1 1 auto !important; flex-direction:column !important; min-height:0 !important; max-height:none !important; overflow:hidden !important; }
       #v111-ocp.collapsed .body { display:none !important; }
       #v111-ocp.collapsed { width:300px !important; max-height:none !important; }
-      #v111-ocp .tabs { position:relative !important; top:auto !important; z-index:20 !important; flex:0 0 auto !important; display:flex !important; margin:0 !important; overflow-x:auto !important; scrollbar-width:thin !important; background:#0d131a !important; border-bottom:1px solid #26384a !important; box-shadow:0 4px 10px rgba(0,0,0,.35) !important; isolation:isolate !important; }
-      #v111-ocp .tabs button { flex:1 0 76px !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#aebed0 !important; }
+      #v111-ocp .tabs { position:relative !important; top:auto !important; z-index:20 !important; flex:0 0 auto !important; display:grid !important; grid-auto-flow:column !important; grid-auto-columns:minmax(0,1fr) !important; width:100% !important; margin:0 !important; overflow:hidden !important; background:#0d131a !important; border-bottom:1px solid #26384a !important; box-shadow:0 4px 10px rgba(0,0,0,.35) !important; isolation:isolate !important; }
+      #v111-ocp .tabs button { min-width:0 !important; border:0 !important; border-radius:0 !important; padding:6px 3px !important; background:transparent !important; color:#aebed0 !important; font-size:10px !important; white-space:normal !important; overflow-wrap:anywhere !important; }
       #v111-ocp .tabs button.active { color:#fff !important; background:#1a2734 !important; box-shadow:inset 0 -3px 0 var(--v111-gold) !important; }
       #v111-ocp .tabs .backend-dot { margin-left:4px !important; color:#7ee2a8 !important; font-size:10px !important; }
       #v111-ocp .activity-bar { display:flex !important; flex:0 0 auto !important; align-items:center !important; gap:8px !important; padding:8px 12px !important; background:#1a2c3b !important; border-bottom:1px solid #36536b !important; color:#eef7ff !important; font-weight:700 !important; }
@@ -4121,16 +4284,18 @@
       #v111-ocp .payout-adjustment .positive { color:#8ee0ae !important; }
       #v111-ocp .payout-adjustment .negative { color:#ff9ea7 !important; }
       #v111-ocp .payout-final { color:#f2c94c !important; font-size:12px !important; }
-      @media(max-width:600px) {
-        #v111-ocp:not(.collapsed) { right:6px !important; top:50% !important; bottom:auto !important; transform:translateY(-50%) !important; width:min(88vw,360px) !important; max-height:40vh !important; font-size:12px !important; }
+      @media(max-width:700px), (pointer:coarse) and (max-width:900px) {
+        #v111-ocp:not(.collapsed) { right:3vw !important; left:auto !important; top:var(--v111-mobile-panel-top,30vh) !important; bottom:auto !important; transform:none !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40svh) !important; font-size:12px !important; }
+        #v111-ocp.keyboard-open:not(.collapsed) { box-shadow:0 8px 34px rgba(0,0,0,.82) !important; }
         #v111-ocp:not(.collapsed) .body { max-height:none !important; }
-        #v111-ocp.collapsed { width:min(240px,calc(100vw - 24px)) !important; max-height:none !important; }
+        #v111-ocp.collapsed { width:min(240px,calc(100vw - 16px)) !important; max-height:none !important; }
         #v111-ocp header { min-height:40px !important; padding:6px 8px !important; }
         #v111-ocp header strong { font-size:13px !important; }
         #v111-ocp header small, #v111-ocp small { font-size:10px !important; }
         #v111-ocp .head-actions button { min-width:27px !important; min-height:27px !important; padding:2px 6px !important; font-size:15px !important; }
         #v111-ocp main { padding:5px !important; }
-        #v111-ocp .tabs button { flex-basis:54px !important; min-height:32px !important; padding:4px 5px !important; font-size:10px !important; }
+        #v111-ocp .tabs { grid-template-columns:repeat(5,minmax(0,1fr)) !important; grid-auto-flow:row !important; grid-auto-columns:auto !important; }
+        #v111-ocp .tabs button { min-height:28px !important; padding:3px 2px !important; font-size:9px !important; line-height:1.05 !important; }
         #v111-ocp .role-grid { grid-template-columns:minmax(0,1fr) !important; }
         #v111-ocp .crime-title { align-items:stretch !important; flex-direction:column !important; }
         #v111-ocp #v111-backend-form { grid-template-columns:minmax(0,1fr) !important; }
@@ -4418,7 +4583,7 @@
       #v111-ocp .profile-roles div, #v111-ocp .stat-bars div { display:flex !important; justify-content:space-between !important; gap:10px !important; padding:7px !important; background:#182531 !important; border-radius:6px !important; }
       #v111-ocp.compact .reason, #v111-ocp.compact .breakdown, #v111-ocp.compact .alts { display:none !important; }
       #v111-ocp.compact .role-card { padding:6px !important; }
-      @media(max-width:600px) {
+      @media(max-width:700px), (pointer:coarse) and (max-width:900px) {
         #v111-ocp:not(.collapsed) { font-size:11px !important; }
         #v111-ocp .dashboard-section { margin-bottom:5px !important; padding:5px !important; }
         #v111-ocp .dashboard-section-head { margin-bottom:4px !important; }
@@ -4451,7 +4616,7 @@
         #v111-ocp .schedule-event-form label, #v111-ocp .schedule-event-form .wide { grid-column:1 !important; }
         #v111-ocp .schedule-event-form textarea { min-height:58px !important; }
         #v111-ocp .notification-preferences fieldset { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
-        #v111-ocp .schedule-toast { right:6vw !important; bottom:8px !important; width:min(88vw,360px) !important; padding:8px !important; font-size:10px !important; }
+        #v111-ocp .schedule-toast { right:3vw !important; bottom:8px !important; width:min(94vw,380px) !important; padding:8px !important; font-size:10px !important; }
         #v111-ocp .admin-summary { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:3px !important; }
         #v111-ocp .admin-summary > div, #v111-ocp .admin-section { padding:5px !important; }
         #v111-ocp .admin-health-grid { grid-template-columns:1fr !important; gap:3px !important; }
@@ -4522,7 +4687,7 @@
         #v111-ocp .member-tags { justify-content:flex-start !important; }
         #v111-ocp .queue-row { align-items:flex-start !important; }
         #v111-ocp .queue-right { align-items:flex-end !important; flex-direction:column !important; }
-        #v111-ocp .member-modal { right:6vw !important; width:min(88vw,360px) !important; max-height:40vh !important; padding:7px !important; font-size:10px !important; }
+        #v111-ocp .member-modal { right:3vw !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40svh) !important; padding:7px !important; font-size:10px !important; }
         #v111-ocp .profile-status { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-analytics-section { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-history-section { margin:5px 0 !important; padding:5px !important; }
@@ -4532,7 +4697,7 @@
         #v111-ocp .analytics-trends span { text-align:left !important; }
         #v111-ocp .profile-roles div, #v111-ocp .stat-bars div { gap:5px !important; padding:5px !important; }
       }
-      @media(pointer:coarse) and (min-width:601px) {
+      @media(pointer:coarse) and (min-width:901px) {
         #v111-ocp button, #v111-ocp a.button { min-height:44px !important; }
         #v111-ocp .mini { min-height:40px !important; }
         #v111-ocp input, #v111-ocp select { min-height:44px !important; }
