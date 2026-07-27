@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.3
+// @version      3.6.0-alpha.4
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
+// @downloadURL  https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
+// @updateURL    https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
 // @match        https://*.torn.com/*
@@ -20,7 +22,7 @@
 (() => {
   'use strict';
 
-  const CLIENT_VERSION = '3.6.0-alpha.3';
+  const CLIENT_VERSION = '3.6.0-alpha.4';
   const INSTANCE_MARKER_ID = 'v111-control-center-singleton';
   const existingMarker = document.getElementById(INSTANCE_MARKER_ID);
   const existingPanel = document.getElementById('v111-ocp');
@@ -109,9 +111,11 @@
     }
   };
 
-  state.settings = Object.assign({ collapsed:false, collapsedPosition:null, planningOpen:true, showBreakdown:true, filter:'all', autoRefresh:false, refreshMinutes:5, compact:false }, state.settings || {});
+  state.cache = normalizeCache(state.cache);
+  state.settings = Object.assign({ collapsed:false, collapsedPosition:null, planningOpen:true, showBreakdown:true, filter:'all', autoRefresh:false, refreshMinutes:5, compact:false }, isPlainRecord(state.settings) ? state.settings : {});
+  state.overrides = isPlainRecord(state.overrides) ? state.overrides : {};
   // Remove obsolete locally stored API keys from pre-backend releases.
-  GM_deleteValue('v111_ocp_keys_v1');
+  removeStoredValue('v111_ocp_keys_v1');
   // Always open the planner with the complete crime list visible.
   state.settings.filter = 'all';
   addStyles();
@@ -123,6 +127,7 @@
   let backendAwakeUntil = 0;
   let backendWakePromise = null;
   let stableMobileViewportHeight = 0;
+  let renderRecoveryAttempted = false;
 
   syncMountToPage();
   configureAutoRefresh();
@@ -171,6 +176,90 @@
     return /(^|[#/])factions?(?:[/=&]|$)/i.test(location.hash);
   }
 
+  function isPlainRecord(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function emptyCache() {
+    return { members: [], crimes: [], syncedAt: 0 };
+  }
+
+  function normalizeCache(value) {
+    if (!isPlainRecord(value)) return emptyCache();
+    const syncedAt = Number(value.syncedAt || 0);
+    return {
+      members: Array.isArray(value.members) ? value.members : [],
+      crimes: Array.isArray(value.crimes) ? value.crimes : [],
+      syncedAt: Number.isFinite(syncedAt) ? syncedAt : 0
+    };
+  }
+
+  function showBootstrapStatus() {
+    if (!root) return;
+    root.dataset.v111Bootstrap = 'true';
+    root.style.cssText = [
+      'position:fixed!important',
+      'right:8px!important',
+      'top:18vh!important',
+      'z-index:2147483646!important',
+      'display:block!important',
+      'visibility:visible!important',
+      'opacity:1!important',
+      'width:min(94vw,380px)!important',
+      'padding:12px!important',
+      'border:1px solid #2d5d91!important',
+      'border-radius:10px!important',
+      'background:#111820!important',
+      'color:#eef5ff!important',
+      'font:13px/1.4 system-ui,-apple-system,\"Segoe UI\",Arial,sans-serif!important',
+      'box-shadow:0 12px 40px rgba(0,0,0,.75)!important'
+    ].join(';');
+    root.innerHTML = '<strong style="display:block;color:#fff">Vault 111 Control Center</strong><small style="display:block;margin-top:3px;color:#b7c8d9">Loading mobile interface…</small>';
+  }
+
+  function clearBootstrapStyles() {
+    if (!root || root.dataset.v111Bootstrap !== 'true') return;
+    root.removeAttribute('style');
+    delete root.dataset.v111Bootstrap;
+  }
+
+  function showStartupFailure(error) {
+    if (!root) return;
+    root.className = '';
+    root.dataset.v111Bootstrap = 'true';
+    root.style.cssText = [
+      'position:fixed!important',
+      'right:8px!important',
+      'top:12vh!important',
+      'z-index:2147483646!important',
+      'display:block!important',
+      'visibility:visible!important',
+      'opacity:1!important',
+      'width:min(94vw,390px)!important',
+      'padding:12px!important',
+      'border:1px solid #cc6b6b!important',
+      'border-radius:10px!important',
+      'background:#181114!important',
+      'color:#fff!important',
+      'font:13px/1.45 system-ui,-apple-system,\"Segoe UI\",Arial,sans-serif!important',
+      'box-shadow:0 12px 40px rgba(0,0,0,.8)!important'
+    ].join(';');
+    root.innerHTML = `
+      <strong style="display:block;font-size:15px">Vault 111 needs to recover</strong>
+      <span style="display:block;margin:6px 0;color:#ffd7d7">The interface could not finish loading on this device. Your API key connection is still saved.</span>
+      <small style="display:block;margin-bottom:8px;color:#d7b8bd">${esc(friendly(error))}</small>
+      <button type="button" data-v111-reload style="margin-right:6px;padding:7px 10px;border:0;border-radius:6px;background:#2d6da8;color:#fff;font-weight:700">Reload Torn</button>
+      <button type="button" data-v111-clear-cache style="padding:7px 10px;border:1px solid #8d6570;border-radius:6px;background:#302027;color:#fff;font-weight:700">Clear display cache</button>`;
+    root.querySelector('[data-v111-reload]')?.addEventListener('click', () => location.reload());
+    root.querySelector('[data-v111-clear-cache]')?.addEventListener('click', () => {
+      state.cache = emptyCache();
+      state.overrides = {};
+      save(STORE.cache, state.cache);
+      save(STORE.overrides, state.overrides);
+      location.reload();
+    });
+  }
+
   function syncMountToPage() {
     if (isFactionPage() && !dismissedUntilReload) {
       const existingRoot = document.getElementById('v111-ocp');
@@ -185,6 +274,7 @@
         root.setAttribute('role', 'region');
         root.setAttribute('aria-label', 'Vault 111 Control Center');
         (document.body || document.documentElement).appendChild(root);
+        showBootstrapStatus();
         render();
         syncMobileViewport(true);
         ensurePanelVisible();
@@ -287,6 +377,33 @@
 
   function render() {
     if (!root || !root.isConnected) return;
+    try {
+      renderUnsafe();
+      renderRecoveryAttempted = false;
+    } catch (error) {
+      console.error('[Vault 111] Control Center render failed.', error);
+      if (!renderRecoveryAttempted) {
+        renderRecoveryAttempted = true;
+        state.cache = emptyCache();
+        state.overrides = {};
+        save(STORE.cache, state.cache);
+        save(STORE.overrides, state.overrides);
+        try {
+          renderUnsafe();
+          return;
+        } catch (retryError) {
+          console.error('[Vault 111] Control Center recovery render failed.', retryError);
+          showStartupFailure(retryError);
+          return;
+        }
+      }
+      showStartupFailure(error);
+    }
+  }
+
+  function renderUnsafe() {
+    if (!root || !root.isConnected) return;
+    clearBootstrapStyles();
     const renderedTab = root.querySelector('[role="tab"][aria-selected="true"]')?.dataset.tab;
     const previousScroller = getScrollContainer();
     if (renderedTab && previousScroller) state.ui.scrollByTab[renderedTab] = previousScroller.scrollTop;
@@ -307,7 +424,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.3 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6 alpha.4 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
@@ -2849,9 +2966,9 @@
   }
 
   function clearBackendSession() {
-    GM_deleteValue(STORE.backendAccess);
-    GM_deleteValue(STORE.backendRefresh);
-    GM_deleteValue(STORE.backendExpires);
+    removeStoredValue(STORE.backendAccess);
+    removeStoredValue(STORE.backendRefresh);
+    removeStoredValue(STORE.backendExpires);
     state.backend.connected = false;
     state.backend.user = null;
     state.backend.sync = null;
@@ -4113,15 +4230,34 @@
   }
   function friendly(error) { return String(error?.message || error || 'Unknown error').slice(0, 300); }
   function formatNumber(n) { return Number(n || 0).toLocaleString(); }
-  function load(key, fallback) { try { return GM_getValue(key, fallback); } catch { return fallback; } }
-  function save(key, value) { GM_setValue(key, value); }
+  function load(key, fallback) {
+    try {
+      return typeof GM_getValue === 'function' ? GM_getValue(key, fallback) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function save(key, value) {
+    try {
+      if (typeof GM_setValue === 'function') GM_setValue(key, value);
+    } catch (error) {
+      console.warn('[Vault 111] Could not save local display state.', error);
+    }
+  }
+  function removeStoredValue(key) {
+    try {
+      if (typeof GM_deleteValue === 'function') GM_deleteValue(key);
+    } catch (error) {
+      console.warn('[Vault 111] Could not remove obsolete local display state.', error);
+    }
+  }
   async function copyText(text) {
     if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
     const area = document.createElement('textarea'); area.value = text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove();
   }
 
   function addStyles() {
-    GM_addStyle(`
+    const css = `
       #v111-ocp {
         --v111-gold: #f2c94c;
         position: fixed !important;
@@ -4779,5 +4915,17 @@
         #v111-ocp *, #v111-ocp *::before, #v111-ocp *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
         #v111-ocp .spinner { animation:none !important; border-color:var(--v111-gold) !important; }
       }
-    `);
+    `;
+    try {
+      if (typeof GM_addStyle === 'function') {
+        GM_addStyle(css);
+        return;
+      }
+    } catch (error) {
+      console.warn('[Vault 111] Userscript style helper was unavailable; using browser styles.', error);
+    }
+    const style = document.createElement('style');
+    style.id = 'v111-control-center-styles';
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
   }})();
