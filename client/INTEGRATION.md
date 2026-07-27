@@ -1,6 +1,6 @@
 # Planner integration
 
-`Vault-111-Control-Center-v3.6.0-alpha.3.user.js` is the working Control Center client with the backend connection merged directly into it.
+`Vault-111-Control-Center-v3.6.0-alpha.4.user.js` is the working Control Center client with the backend connection merged directly into it.
 
 The planner and optimizer remain available. The old local key manager and pre-release fictional-data mode have been removed. The visible **API Key** tab:
 

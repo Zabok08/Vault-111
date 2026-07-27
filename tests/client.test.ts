@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.3.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.4.user.js"),
   "utf8"
 );
 
@@ -117,7 +117,7 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.6.0-alpha.3");
+    expect(client).toContain("@version      3.6.0-alpha.4");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -171,6 +171,16 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("existingMarker?.remove()");
     expect(client).toContain("function ensurePanelVisible()");
     expect(client).toContain("window.addEventListener('pageshow'");
+  });
+
+  it("keeps mobile startup visible and recovers from stale local display data", () => {
+    expect(client).toContain("showBootstrapStatus()");
+    expect(client).toContain("function showStartupFailure(error)");
+    expect(client).toContain("state.cache = normalizeCache(state.cache)");
+    expect(client).toContain("state.settings = Object.assign");
+    expect(client).toContain("typeof GM_addStyle === 'function'");
+    expect(client).toContain("typeof GM_deleteValue === 'function'");
+    expect(client).toContain("Clear display cache");
   });
 
   it("adds the shared scheduler, automatic events, and member reminder preferences", () => {
