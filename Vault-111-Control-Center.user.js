@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.7
+// @version      3.6.0
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
 // @downloadURL  https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
@@ -23,7 +23,7 @@
   'use strict';
 
   function startControlCenter() {
-  const CLIENT_VERSION = '3.6.0-alpha.7';
+  const CLIENT_VERSION = '3.6.0';
   const INSTANCE_MARKER_ID = 'v111-control-center-singleton';
   const existingMarker = document.getElementById(INSTANCE_MARKER_ID);
   const existingPanel = document.getElementById('v111-ocp');
@@ -440,7 +440,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.7 \u00B7 ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> \u00B7 ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6.0 \u00B7 ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> \u00B7 ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '\u25A3' : '\u2014'}</button>

@@ -1,4 +1,4 @@
-# Vault 111 Control Center — Version 3.6 alpha.3
+# Vault 111 Control Center — Version 3.6.0
 
 This is a production-minded backend scaffold plus a minimal Tampermonkey connection layer. It does not replace the Version 2 planner: the planner remains the UI and local optimizer.
 
@@ -90,7 +90,7 @@ Requirements: Node.js 22+, Docker Desktop (or PostgreSQL 15+), and Tampermonkey.
    ```
 
 6. Confirm `http://127.0.0.1:3000/health`.
-7. Install `client/Vault-111-Control-Center-v3.6.0-alpha.4.user.js` in Tampermonkey.
+7. Install `client/Vault-111-Control-Center-v3.6.0.user.js` in Tampermonkey or Torn PDA.
 
 ## First shared synchronization
 
