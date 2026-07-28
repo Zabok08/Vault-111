@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 const client = readFileSync(
-  resolve("client/Vault-111-Control-Center-v3.6.0-alpha.4.user.js"),
+  resolve("client/Vault-111-Control-Center-v3.6.0.user.js"),
   "utf8"
 );
 
@@ -101,7 +102,7 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("/payout/finalize");
     expect(client).toContain("/payout/reopen");
     expect(client).toContain("data-save-payout-member");
-    expect(client).toContain("War hit 1 · OOW chain hit 0.5 · OOW non-chain hit 0.25");
+    expect(client).toContain("War hit 1 \\u00B7 OOW chain hit 0.5 \\u00B7 OOW non-chain hit 0.25");
     expect(client).toContain("row.warHits");
     expect(client).toContain("row.chainHits");
     expect(client).toContain("row.outsideChainHits");
@@ -117,7 +118,9 @@ describe("Tampermonkey release client", () => {
   });
 
   it("adds privacy-aware member battle-stat and drug analytics", () => {
-    expect(client).toContain("@version      3.6.0-alpha.4");
+    expect(client).toContain("@version      3.6.0");
+    expect(client).not.toContain("@version      3.6.0-alpha");
+    expect(client).toContain("const CLIENT_VERSION = '3.6.0';");
     expect(client).toContain("renderMemberSummary(directoryMembers)");
     expect(client).toContain("backendApi('GET', '/v1/members/overview'");
     expect(client).toContain("backendApi('POST', '/v1/me/analytics/sync'");
@@ -183,6 +186,53 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("Clear display cache");
   });
 
+  it("supports Torn PDA start-time injection and native backend requests", () => {
+    expect(client).toContain("@run-at       document-end");
+    expect(client).toContain("function startControlCenter()");
+    expect(client).toContain("document.addEventListener('DOMContentLoaded', startControlCenter");
+    expect(client).toContain("window.PDA_httpGet");
+    expect(client).toContain("window.PDA_httpPost");
+    expect(client).toContain("window.PDA_httpPut");
+    expect(client).toContain("window.PDA_httpDelete");
+    expect(client).toContain("window.PDA_httpPatch");
+    expect(client).toContain("through Torn PDA");
+  });
+
+  it("does not touch the page DOM before Torn PDA finishes creating it", () => {
+    let readyHandler: (() => void) | null = null;
+    const documentStub = {
+      readyState: "loading",
+      documentElement: null,
+      addEventListener: (event: string, handler: () => void) => {
+        if (event === "DOMContentLoaded") readyHandler = handler;
+      }
+    };
+
+    expect(() => runInNewContext(client, { document: documentStub })).not.toThrow();
+    expect(readyHandler).toBeTypeOf("function");
+  });
+
+  it("keeps the userscript source ASCII-safe for Torn PDA", () => {
+    expect(client).not.toMatch(/[^\u0000-\u007f]/);
+    expect(client).toContain("\\u00B7");
+    expect(client).toContain("\\u2014");
+    expect(client).toContain("\\u00D7");
+    expect(client).toContain("\\u25CF");
+  });
+
+  it("fits member profiles inside the measured Torn PDA viewport", () => {
+    expect(client).toContain("--v111-mobile-modal-height");
+    expect(client).toContain("--v111-mobile-modal-top");
+    expect(client).toContain("--v111-mobile-modal-width");
+    expect(client).toContain("const visibleModalHeight = Math.min");
+    expect(client).toContain("position:fixed !important;");
+    expect(client).toContain("width:var(--v111-mobile-modal-width,min(88vw,340px))");
+    expect(client).toContain("max-height:var(--v111-mobile-modal-height,58vh)");
+    expect(client).toContain("overflow-x:hidden !important;");
+    expect(client).toContain("-webkit-overflow-scrolling:touch");
+    expect(client).toContain("#v111-ocp .member-modal .modal-head");
+  });
+
   it("adds the shared scheduler, automatic events, and member reminder preferences", () => {
     expect(client).toContain('data-tab="schedule"');
     expect(client).toContain("renderSchedulePanel()");
@@ -206,7 +256,7 @@ describe("Tampermonkey release client", () => {
     expect(client).toContain("/v1/admin/role-mappings/");
     expect(client).toContain("/suspension");
     expect(client).toContain("/revoke-sessions");
-    expect(client).toContain("API connection status only—keys are never shown");
+    expect(client).toContain("API connection status only\\u2014keys are never shown");
     expect(client).not.toContain("apiKeyFingerprint");
     expect(client).not.toContain("encryptedApiKey");
   });
