@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.4
+// @version      3.6.0-alpha.6
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
 // @downloadURL  https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
@@ -16,13 +16,14 @@
 // @grant        GM_deleteValue
 // @grant        GM_addStyle
 // @grant        GM_notification
-// @run-at       document-idle
+// @run-at       document-end
 // ==/UserScript==
 
 (() => {
   'use strict';
 
-  const CLIENT_VERSION = '3.6.0-alpha.4';
+  function startControlCenter() {
+  const CLIENT_VERSION = '3.6.0-alpha.6';
   const INSTANCE_MARKER_ID = 'v111-control-center-singleton';
   const existingMarker = document.getElementById(INSTANCE_MARKER_ID);
   const existingPanel = document.getElementById('v111-ocp');
@@ -214,7 +215,7 @@
       'font:13px/1.4 system-ui,-apple-system,\"Segoe UI\",Arial,sans-serif!important',
       'box-shadow:0 12px 40px rgba(0,0,0,.75)!important'
     ].join(';');
-    root.innerHTML = '<strong style="display:block;color:#fff">Vault 111 Control Center</strong><small style="display:block;margin-top:3px;color:#b7c8d9">Loading mobile interface…</small>';
+    root.innerHTML = '<strong style="display:block;color:#fff">Vault 111 Control Center</strong><small style="display:block;margin-top:3px;color:#b7c8d9">Loading mobile interface\u2026</small>';
   }
 
   function clearBootstrapStyles() {
@@ -424,11 +425,11 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.4 · ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> · ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6 alpha.6 \u00B7 ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> \u00B7 ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
-          <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '▣' : '—'}</button>
-          <button data-act="close" aria-label="Hide planner until page reload" title="Hide until page reload">×</button>
+          <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '\u25A3' : '\u2014'}</button>
+          <button data-act="close" aria-label="Hide planner until page reload" title="Hide until page reload">\u00D7</button>
         </div>
       </header>
       <div class="body" id="v111-body">
@@ -440,10 +441,10 @@
           <button class="${isActive('payouts') ? 'active' : ''}" data-tab="payouts" ${tabAttributes('payouts')}>Payouts</button>
           <button class="${isActive('schedule') ? 'active' : ''}" data-tab="schedule" ${tabAttributes('schedule')}>Schedule</button>
           ${backendCanAdminRead() ? `<button class="${isActive('admin') ? 'active' : ''}" data-tab="admin" ${tabAttributes('admin')}>Admin</button>` : ''}
-          <button class="${isActive('backend') ? 'active' : ''}" data-tab="backend" ${tabAttributes('backend')} aria-label="API Key${state.backend.connected ? ', connected' : ', disconnected'}">API Key ${state.backend.connected ? '<span class="backend-dot" aria-hidden="true">●</span>' : ''}</button>
+          <button class="${isActive('backend') ? 'active' : ''}" data-tab="backend" ${tabAttributes('backend')} aria-label="API Key${state.backend.connected ? ', connected' : ', disconnected'}">API Key ${state.backend.connected ? '<span class="backend-dot" aria-hidden="true">\u25CF</span>' : ''}</button>
           <button class="${isActive('settings') ? 'active' : ''}" data-tab="settings" ${tabAttributes('settings')}>Settings</button>
         </div>
-        ${state.backend.loading ? `<div class="activity-bar" role="status" aria-live="polite" aria-atomic="true"><span class="spinner" aria-hidden="true"></span>${esc(state.ui.busyLabel || 'Working…')}</div>` : ''}
+        ${state.backend.loading ? `<div class="activity-bar" role="status" aria-live="polite" aria-atomic="true"><span class="spinner" aria-hidden="true"></span>${esc(state.ui.busyLabel || 'Working\u2026')}</div>` : ''}
         <main>
           <section data-pane="dashboard" ${paneAttributes('dashboard')}>
             ${renderDashboard(metrics, plans)}
@@ -467,7 +468,7 @@
                   <option value="mine" ${state.settings.filter === 'mine' ? 'selected' : ''}>My assignments</option>
                 </select>
               </label>
-              <span>${plans.length} crimes · ${metrics.available} eligible members with stats · ${metrics.occupied} occupied</span>
+              <span>${plans.length} crimes \u00B7 ${metrics.available} eligible members with stats \u00B7 ${metrics.occupied} occupied</span>
             </div>
             <div class="plans">${renderPlans(plans)}</div>
           </section>
@@ -605,7 +606,7 @@
     if (!snapshot) {
       return `<section class="dashboard-section announcements-panel" aria-busy="true">
         <div class="dashboard-section-head"><h3>Announcements</h3></div>
-        <p class="notice">Loading the shared faction dashboard…</p>
+        <p class="notice">Loading the shared faction dashboard\u2026</p>
       </section>`;
     }
     const announcements = snapshot.announcements || [];
@@ -625,7 +626,7 @@
             </div>` : ''}
           </div>
           <p>${esc(announcement.body)}</p>
-          <small>Posted by ${esc(announcement.createdBy?.name || 'Vault 111 officer')} · ${formatRelativeDate(announcement.createdAt)}${announcement.expiresAt ? ` · Expires ${esc(new Date(announcement.expiresAt).toLocaleString())}` : ''}${timestampMs(announcement.updatedAt) > timestampMs(announcement.createdAt) + 1000 ? ` · Updated ${formatRelativeDate(announcement.updatedAt)}` : ''}</small>
+          <small>Posted by ${esc(announcement.createdBy?.name || 'Vault 111 officer')} \u00B7 ${formatRelativeDate(announcement.createdAt)}${announcement.expiresAt ? ` \u00B7 Expires ${esc(new Date(announcement.expiresAt).toLocaleString())}` : ''}${timestampMs(announcement.updatedAt) > timestampMs(announcement.createdAt) + 1000 ? ` \u00B7 Updated ${formatRelativeDate(announcement.updatedAt)}` : ''}</small>
         </article>`).join('') : '<div class="empty">No active faction announcements.</div>'}</div>
     </section>`;
   }
@@ -676,7 +677,7 @@
     if (!snapshot) {
       return `<section class="dashboard-section upcoming-events-panel" aria-busy="true">
         <div class="dashboard-section-head"><h3>Upcoming events</h3></div>
-        <p class="notice">Loading the shared faction schedule…</p>
+        <p class="notice">Loading the shared faction schedule\u2026</p>
       </section>`;
     }
     const events = upcomingScheduleEvents(snapshot, 5);
@@ -810,7 +811,7 @@
           <span data-event-countdown="${esc(event.id)}">${esc(eventCountdown(event.startsAt))}</span>
           ${event.endsAt ? `<small>Ends ${esc(new Date(event.endsAt).toLocaleString())}</small>` : ''}
         </div>
-        ${event.createdBy?.name ? `<small>Created by ${esc(event.createdBy.name)}${timestampMs(event.updatedAt) > timestampMs(event.createdAt) + 1000 ? ` · Updated ${formatRelativeDate(event.updatedAt)}` : ''}</small>` : ''}
+        ${event.createdBy?.name ? `<small>Created by ${esc(event.createdBy.name)}${timestampMs(event.updatedAt) > timestampMs(event.createdAt) + 1000 ? ` \u00B7 Updated ${formatRelativeDate(event.updatedAt)}` : ''}</small>` : ''}
       </article>`).join('') : '<div class="empty">No events match this filter.</div>'}</div>
     ${renderNotificationPreferences(snapshot)}`;
   }
@@ -877,12 +878,12 @@
           <article>
             <b>Faction data</b>
             <strong class="${snapshot.sync?.faction?.lastError ? 'warning' : 'healthy'}">${snapshot.sync?.faction?.lastError ? 'Needs attention' : 'Operational'}</strong>
-            <small>${esc(formatRelativeDate(snapshot.sync?.faction?.lastSuccessAt))}${snapshot.sync?.faction?.lastError ? ` · ${esc(snapshot.sync.faction.lastError)}` : ''}</small>
+            <small>${esc(formatRelativeDate(snapshot.sync?.faction?.lastSuccessAt))}${snapshot.sync?.faction?.lastError ? ` \u00B7 ${esc(snapshot.sync.faction.lastError)}` : ''}</small>
           </article>
           <article>
             <b>Ranked War data</b>
             <strong class="${snapshot.sync?.war?.lastError ? 'warning' : 'healthy'}">${snapshot.sync?.war?.lastError ? 'Needs attention' : 'Operational'}</strong>
-            <small>${esc(formatRelativeDate(snapshot.sync?.war?.lastSuccessAt))}${snapshot.sync?.war?.lastError ? ` · ${esc(snapshot.sync.war.lastError)}` : ''}</small>
+            <small>${esc(formatRelativeDate(snapshot.sync?.war?.lastSuccessAt))}${snapshot.sync?.war?.lastError ? ` \u00B7 ${esc(snapshot.sync.war.lastError)}` : ''}</small>
           </article>
         </div>
       </section>
@@ -895,7 +896,7 @@
         <div class="admin-mapping-list">${(snapshot.positions || []).length ? snapshot.positions.map(position => {
           const mapping = position.mapping;
           return `<article class="admin-mapping-row" data-admin-position="${esc(position.factionPosition)}">
-            <div><b>${esc(position.factionPosition)}</b><small>${formatNumber(position.memberCount)} active member${Number(position.memberCount) === 1 ? '' : 's'} · ${mapping ? `Mapped to ${esc(adminRoleLabel(mapping.appRole))}` : 'Unmapped (Member)'}</small></div>
+            <div><b>${esc(position.factionPosition)}</b><small>${formatNumber(position.memberCount)} active member${Number(position.memberCount) === 1 ? '' : 's'} \u00B7 ${mapping ? `Mapped to ${esc(adminRoleLabel(mapping.appRole))}` : 'Unmapped (Member)'}</small></div>
             ${canManage ? `<select data-role-mapping-select aria-label="Control Center role for ${esc(position.factionPosition)}">
               ${roles.map(role => `<option value="${esc(role)}" ${role === (mapping?.appRole || 'MEMBER') ? 'selected' : ''}>${esc(adminRoleLabel(role))}</option>`).join('')}
             </select>
@@ -906,7 +907,7 @@
       </section>
       <section class="admin-section">
         <div class="admin-section-head">
-          <div><h3>Control Center users</h3><small>API connection status only—keys are never shown</small></div>
+          <div><h3>Control Center users</h3><small>API connection status only\u2014keys are never shown</small></div>
         </div>
         <label class="sr-only" for="v111-admin-user-search">Search Control Center users</label>
         <input id="v111-admin-user-search" class="admin-search" type="search" value="${esc(state.ui.adminUserSearch)}" placeholder="Search users, positions, or roles">
@@ -922,7 +923,7 @@
               <span><b>${user.analyticsEnabled ? 'Enabled' : 'Disabled'}</b>Analytics</span>
               <span><b>${user.isSuspended ? 'Suspended' : 'Active'}</b>Access</span>
             </div>
-            <small>Verified ${esc(formatRelativeDate(user.lastVerifiedAt))}${user.apiKeyUpdatedAt ? ` · Key updated ${esc(formatRelativeDate(user.apiKeyUpdatedAt))}` : ''}${user.activeFactionMember === false ? ' · Not active in the latest faction sync' : ''}</small>
+            <small>Verified ${esc(formatRelativeDate(user.lastVerifiedAt))}${user.apiKeyUpdatedAt ? ` \u00B7 Key updated ${esc(formatRelativeDate(user.apiKeyUpdatedAt))}` : ''}${user.activeFactionMember === false ? ' \u00B7 Not active in the latest faction sync' : ''}</small>
             ${canManage && user.manageable ? `<div class="admin-user-actions">
               <button class="mini ${user.isSuspended ? 'primary' : 'danger'}" data-admin-suspend="${user.isSuspended ? 'false' : 'true'}" data-admin-user-id="${esc(user.id)}" data-admin-user-version="${Number(user.version)}"${busyAttributes()}>${user.isSuspended ? 'Restore access' : 'Suspend access'}</button>
               <button class="mini" data-admin-revoke-sessions data-admin-user-id="${esc(user.id)}" data-admin-user-version="${Number(user.version)}"${busyAttributes()}>Revoke sessions</button>
@@ -945,8 +946,8 @@
         <div class="admin-audit-list">${auditEvents.length ? auditEvents.map(event => {
           const metadata = event.metadata && Object.keys(event.metadata).length ? JSON.stringify(event.metadata) : '';
           return `<article class="admin-audit-row" data-admin-audit="${esc(adminAuditCategory(event.action))}">
-            <div><b>${esc(event.action)}</b><small>${event.actor ? `${esc(event.actor.name)} [${Number(event.actor.tornId)}]` : 'System'} · ${esc(new Date(event.createdAt).toLocaleString())}</small></div>
-            <span>${esc(event.resource)}${event.resourceId ? ` · ${esc(event.resourceId)}` : ''}</span>
+            <div><b>${esc(event.action)}</b><small>${event.actor ? `${esc(event.actor.name)} [${Number(event.actor.tornId)}]` : 'System'} \u00B7 ${esc(new Date(event.createdAt).toLocaleString())}</small></div>
+            <span>${esc(event.resource)}${event.resourceId ? ` \u00B7 ${esc(event.resourceId)}` : ''}</span>
             ${metadata ? `<details><summary>Details</summary><code>${esc(metadata)}</code></details>` : ''}
           </article>`;
         }).join('') : '<div class="empty">No audit activity is available.</div>'}</div>
@@ -965,7 +966,7 @@
     if (!snapshot) {
       return `<section class="dashboard-section control-overview" aria-busy="true">
         <div class="dashboard-section-head"><h3>Faction overview</h3></div>
-        <p class="notice">Loading shared war, member, payout, and synchronization summaries…</p>
+        <p class="notice">Loading shared war, member, payout, and synchronization summaries\u2026</p>
       </section>`;
     }
     const war = snapshot.war;
@@ -986,7 +987,7 @@
           <small>Ranked war</small>
           ${war ? `
             <h4>vs ${esc(war.opponentName)}</h4>
-            <b>${formatNumber(war.factionScore)} – ${formatNumber(war.opponentScore)}</b>
+            <b>${formatNumber(war.factionScore)} \u2013 ${formatNumber(war.opponentScore)}</b>
             <span data-dashboard-war-countdown>${esc(warCountdownLabel(war))}</span>
           ` : '<h4>No synchronized war</h4><span>Open the War tab for synchronization controls.</span>'}
           <button class="mini" data-jump="war">Open War</button>
@@ -1007,8 +1008,8 @@
         <article class="overview-card members">
           <small>Member availability</small>
           <h4>${formatNumber(members.available)} available</h4>
-          <b>${formatNumber(members.inOc)} in OC · ${formatNumber(members.hospitalized)} hospital</b>
-          <span>${formatNumber(members.traveling)} traveling · ${formatNumber(members.inactive)} inactive</span>
+          <b>${formatNumber(members.inOc)} in OC \u00B7 ${formatNumber(members.hospitalized)} hospital</b>
+          <span>${formatNumber(members.traveling)} traveling \u00B7 ${formatNumber(members.inactive)} inactive</span>
           <button class="mini" data-jump="members">Open Members</button>
         </article>
         <article class="overview-card payout">
@@ -1016,7 +1017,7 @@
           ${payout ? `
             <h4>${formatMoney(payout.finalTotal)}</h4>
             <b>vs ${esc(payout.opponentName)}</b>
-            <span>${formatNumber(payout.membersPaid)} members · ${formatRelativeDate(payout.finalizedAt)}</span>
+            <span>${formatNumber(payout.membersPaid)} members \u00B7 ${formatRelativeDate(payout.finalizedAt)}</span>
           ` : '<h4>No finalized payout</h4><span>Finalized war payouts will appear here.</span>'}
           <button class="mini" data-jump="payouts">Open Payouts</button>
         </article>
@@ -1024,7 +1025,7 @@
           <small>Data health</small>
           <h4>${syncErrors.length ? 'Needs attention' : 'Operational'}</h4>
           <b>Faction ${formatRelativeDate(factionSync?.lastSuccessAt)}</b>
-          <span>War ${formatRelativeDate(warSync?.lastSuccessAt)} · Analytics ${formatRelativeDate(snapshot.sync?.analyticsLastSuccessAt)}</span>
+          <span>War ${formatRelativeDate(warSync?.lastSuccessAt)} \u00B7 Analytics ${formatRelativeDate(snapshot.sync?.analyticsLastSuccessAt)}</span>
           ${syncErrors.length ? `<em>${esc(syncErrors[0])}</em>` : ''}
           <button class="mini" data-jump="backend">API & Sync</button>
         </article>
@@ -1224,7 +1225,7 @@
   }
 
   function formatLargeInteger(value) {
-    if (value === null || value === undefined || value === '') return '—';
+    if (value === null || value === undefined || value === '') return '\u2014';
     try {
       return BigInt(String(value)).toLocaleString();
     } catch {
@@ -1251,7 +1252,7 @@
   }
 
   function formatGain(value) {
-    if (value === null || value === undefined) return '—';
+    if (value === null || value === undefined) return '\u2014';
     const text = String(value);
     return `${text.startsWith('-') || text === '0' ? '' : '+'}${formatLargeInteger(text)}`;
   }
@@ -1289,7 +1290,7 @@
       const analyticsShared = ['exact', 'private'].includes(member.analyticsAccess);
       const analytics = member.analytics;
       return `<button class="member-row" data-member-id="${member.id}" data-member-name="${esc(String(member.name).toLowerCase())}" data-member-status="${group}" data-member-analytics="${analyticsShared}" aria-haspopup="dialog">
-        <span class="member-identity"><b>${esc(member.name)} [${member.id}]</b><small>${esc(member.position || 'Member')} · ${esc(member.status || 'Status unknown')} · ${formatRelativeDate(member.lastActionAt)}</small></span>
+        <span class="member-identity"><b>${esc(member.name)} [${member.id}]</b><small>${esc(member.position || 'Member')} \u00B7 ${esc(member.status || 'Status unknown')} \u00B7 ${formatRelativeDate(member.lastActionAt)}</small></span>
         <span class="member-tags">
           ${analytics?.battle?.total ? `<i class="analytics-tag">BS ${formatLargeInteger(analytics.battle.total)}</i>` : ''}
           ${analytics?.drugs?.xanax !== null && analytics?.drugs?.xanax !== undefined ? `<i class="analytics-tag">Xanax ${formatNumber(analytics.drugs.xanax)}</i>` : ''}
@@ -1335,7 +1336,7 @@
     if (loading || !history) {
       return `<section class="member-history-section" aria-busy="true">
         <div class="analytics-heading"><h4>War &amp; payout history</h4><small>Last five wars</small></div>
-        <p class="notice">Loading ranked-war history…</p>
+        <p class="notice">Loading ranked-war history\u2026</p>
       </section>`;
     }
     if (history.error) {
@@ -1372,7 +1373,7 @@
             <b>vs ${esc(war.opponentName || `Faction ${war.opponentFactionId}`)}</b>
             <i class="history-outcome ${esc(war.outcome || 'completed')}">${esc(war.outcome || 'completed')}</i>
           </div>
-          <small>${formatWarHistoryDate(war.startsAt)} · War #${Number(war.id)}</small>
+          <small>${formatWarHistoryDate(war.startsAt)} \u00B7 War #${Number(war.id)}</small>
           <div class="member-war-metrics">
             <span><b>${formatNumber(performance.warHits)}</b> war</span>
             <span><b>${formatNumber(performance.chainHits)}</b> OOW chain</span>
@@ -1455,13 +1456,13 @@
     const modal = root.querySelector('#v111-modal');
     modal.hidden = false;
     modal.innerHTML = `<div class="modal-backdrop" data-close-modal aria-hidden="true"></div><article class="member-modal" role="dialog" aria-modal="true" aria-labelledby="v111-member-modal-title" tabindex="-1">
-      <div class="modal-head"><div><h3 id="v111-member-modal-title">${esc(member.name)} [${member.id}]</h3><small>${esc(member.position || 'Faction member')} · Level ${member.level || '?'}</small></div><button data-close-modal aria-label="Close member profile" title="Close">×</button></div>
+      <div class="modal-head"><div><h3 id="v111-member-modal-title">${esc(member.name)} [${member.id}]</h3><small>${esc(member.position || 'Faction member')} \u00B7 Level ${member.level || '?'}</small></div><button data-close-modal aria-label="Close member profile" title="Close">\u00D7</button></div>
       <div class="profile-status ${member.isInOc ? 'busy' : 'free'}">${member.isInOc ? 'Currently in an OC' : 'Available for planning'}</div>
       <div class="member-live-status"><span>${esc(member.status || 'Status unknown')}</span><span>Last action ${formatRelativeDate(member.lastActionAt)}</span></div>
       ${analyticsBody}
       ${renderMemberWarHistory(member.id)}
       <h4>Best tracked roles</h4>
-      <div class="profile-roles">${roles.length ? roles.map(r => `<div><b>${esc(r.role)}</b><span>${esc(r.crime)} · score ${Math.round(r.score)}</span></div>`).join('') : '<p>No personal stats loaded.</p>'}</div>
+      <div class="profile-roles">${roles.length ? roles.map(r => `<div><b>${esc(r.role)}</b><span>${esc(r.crime)} \u00B7 score ${Math.round(r.score)}</span></div>`).join('') : '<p>No personal stats loaded.</p>'}</div>
       <h4>Strongest tracked categories</h4>
       <div class="stat-bars">${totals.map(([k,v]) => `<div><span>${esc(k)}</span><b>${formatNumber(v)}</b></div>`).join('') || '<p>No tracked stats.</p>'}</div>
       <div class="toolbar"><a class="button primary" href="https://www.torn.com/profiles.php?XID=${member.id}" target="_blank" rel="noopener">Open profile</a></div>
@@ -1555,7 +1556,7 @@
       const missing = crime.slots.filter(s => !s.existing && !s.assigned).length;
       return `<article class="crime-card" data-crime-id="${esc(crime.id)}" tabindex="-1" aria-labelledby="v111-crime-title-${esc(crime.id)}">
         <div class="crime-title">
-          <div><h3 id="v111-crime-title-${esc(crime.id)}">${esc(crime.name)}</h3><small>Difficulty ${crime.difficulty || '?'} · ${esc(crime.status || 'available')} · ${missing ? `${missing} role${missing === 1 ? '' : 's'} missing` : 'crew filled'}</small></div>
+          <div><h3 id="v111-crime-title-${esc(crime.id)}">${esc(crime.name)}</h3><small>Difficulty ${crime.difficulty || '?'} \u00B7 ${esc(crime.status || 'available')} \u00B7 ${missing ? `${missing} role${missing === 1 ? '' : 's'} missing` : 'crew filled'}</small></div>
           <div class="crime-title-actions"><span class="readiness-badge ${readinessClass(readiness)}">${readiness}%</span><a class="button primary" href="${esc(crime.url)}" target="_blank" rel="noopener">Open Crime</a></div>
         </div>
         <div class="crime-readiness" role="progressbar" aria-label="${esc(`${crime.name} readiness`)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${readiness}"><i class="${readinessClass(readiness)}" style="width:${readiness}%"></i></div>
@@ -1565,20 +1566,20 @@
               <div class="role-heading"><div class="role-name">${esc(slot.role)}</div>${slot.shared ? '<span class="lock-badge shared">SHARED</span>' : (slot.manual ? '<span class="lock-badge">LOCKED</span>' : '')}</div>
               ${slot.assigned ? `
                 <button class="player-link" data-member-id="${slot.assigned.id}" aria-haspopup="dialog">${esc(slot.assigned.name)} [${slot.assigned.id}]</button>
-                <div class="score">${slot.existing ? `Confirmed assignment · Fit ${Math.round(slot.score || 0)} · Confidence ${slot.confidence}%` : `Fit ${Math.round(slot.score)} · Confidence ${slot.confidence}%`}</div>
+                <div class="score">${slot.existing ? `Confirmed assignment \u00B7 Fit ${Math.round(slot.score || 0)} \u00B7 Confidence ${slot.confidence}%` : `Fit ${Math.round(slot.score)} \u00B7 Confidence ${slot.confidence}%`}</div>
                 <div class="confidence" role="progressbar" aria-label="${esc(`${slot.assigned.name} confidence for ${slot.role}`)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${slot.confidence}"><i style="width:${slot.confidence}%"></i></div>
                 <div class="reason">${esc(slot.reason)}</div>
-                ${state.settings.showBreakdown !== false && slot.breakdown ? `<div class="breakdown">${slot.breakdown.map(x => `${esc(x.label)} ${x.value >= 0 ? '+' : ''}${Math.round(x.value)}`).join(' · ')}</div>` : ''}
+                ${state.settings.showBreakdown !== false && slot.breakdown ? `<div class="breakdown">${slot.breakdown.map(x => `${esc(x.label)} ${x.value >= 0 ? '+' : ''}${Math.round(x.value)}`).join(' \u00B7 ')}</div>` : ''}
                 ${!slot.existing && state.backend.connected && backendCanAssign() ? `<label class="candidate-select-label">Shared assignment
                   <select data-role-select="${esc(slot.key)}" data-crime-id="${esc(crime.id)}"${busyAttributes()}>
                     <option value="">Automatic best fit</option>
-                    ${(slot.candidatePool || []).map(a => `<option value="${a.id}" ${slot.manual && Number(slot.assigned.id) === Number(a.id) ? 'selected' : ''}>${esc(a.name)} [${a.id}] · ${Math.round(a.score)}</option>`).join('')}
+                    ${(slot.candidatePool || []).map(a => `<option value="${a.id}" ${slot.manual && Number(slot.assigned.id) === Number(a.id) ? 'selected' : ''}>${esc(a.name)} [${a.id}] \u00B7 ${Math.round(a.score)}</option>`).join('')}
                   </select>
                 </label>` : ''}
                 ${slot.alternatives?.length ? `<div class="alts">Backups: ${slot.alternatives.map(a => `${esc(a.name)} (${Math.round(a.score)})`).join(', ')}</div>` : ''}
                 <div class="role-actions">
                   <a class="mini primary" href="${esc(crime.url)}" target="_blank" rel="noopener">Join screen</a>
-                  <button class="mini" data-copy-assignment="${esc(`${slot.assigned.name} [${slot.assigned.id}] → ${crime.name} / ${slot.role}`)}">Copy</button>
+                  <button class="mini" data-copy-assignment="${esc(`${slot.assigned.name} [${slot.assigned.id}] \u2192 ${crime.name} / ${slot.role}`)}">Copy</button>
                 </div>` : '<div class="unfilled">No eligible member</div>'}
             </div>`).join('')}
         </div>
@@ -1594,8 +1595,8 @@
     const planningMarkup = planning.length ? `
       <section class="planning-group ${planningOpen ? 'is-open' : ''}">
         <button type="button" class="planning-group-summary" data-act="toggle-planning" aria-expanded="${planningOpen}" aria-controls="${planningContentId}">
-          <span><b>Planning-stage crimes</b><small>${planning.length} crime${planning.length === 1 ? '' : 's'} · optimized as one crew board</small></span>
-          <span class="dropdown-icon" aria-hidden="true">${planningOpen ? '⌃' : '⌄'}</span>
+          <span><b>Planning-stage crimes</b><small>${planning.length} crime${planning.length === 1 ? '' : 's'} \u00B7 optimized as one crew board</small></span>
+          <span class="dropdown-icon" aria-hidden="true">${planningOpen ? '\u2303' : '\u2304'}</span>
         </button>
         <div class="planning-group-content" id="${planningContentId}"${planningOpen ? '' : ' hidden'}>
           ${planning.map(({ crime, index }) => renderCrimeCard(crime, index)).join('')}
@@ -1608,7 +1609,7 @@
       return groups;
     }, {})).map(group => `
       <section class="status-group">
-        <div class="status-group-heading"><b>${esc(group.label)} crimes</b><small>${group.items.length} crime${group.items.length === 1 ? '' : 's'} · current crew and recommendations</small></div>
+        <div class="status-group-heading"><b>${esc(group.label)} crimes</b><small>${group.items.length} crime${group.items.length === 1 ? '' : 's'} \u00B7 current crew and recommendations</small></div>
         <div class="status-group-content">${group.items.map(({ crime, index }) => renderCrimeCard(crime, index)).join('')}</div>
       </section>`).join('');
 
@@ -1694,7 +1695,7 @@
           const stateClass = warTargetStateClass(target.statusState);
           const note = String(target.note || '');
           const noteAuthor = target.noteUpdatedBy?.name
-            ? `${target.noteUpdatedBy.name}${target.noteUpdatedAt ? ` · ${new Date(target.noteUpdatedAt).toLocaleString()}` : ''}`
+            ? `${target.noteUpdatedBy.name}${target.noteUpdatedAt ? ` \u00B7 ${new Date(target.noteUpdatedAt).toLocaleString()}` : ''}`
             : '';
           const until = timestampMs(target.statusUntil);
           const lastAction = timestampMs(target.lastActionAt);
@@ -1703,13 +1704,13 @@
               <div class="war-target-main">
                 <div>
                   <a class="war-target-name" href="https://www.torn.com/profiles.php?XID=${Number(target.tornId)}" target="_blank" rel="noopener">${esc(target.name)} [${Number(target.tornId)}]</a>
-                  <small>Level ${formatNumber(target.level)}${target.position ? ` · ${esc(target.position)}` : ''}</small>
+                  <small>Level ${formatNumber(target.level)}${target.position ? ` \u00B7 ${esc(target.position)}` : ''}</small>
                 </div>
                 <span class="target-status ${stateClass}">${esc(target.statusState || 'Unknown')}</span>
               </div>
               <div class="war-target-details">
-                <span>${esc(target.statusDescription || target.statusState || 'Status unavailable')}${until > Date.now() ? ` · until ${new Date(until).toLocaleTimeString()}` : ''}</span>
-                <span>${lastAction ? `Last action ${new Date(lastAction).toLocaleString()}` : 'Last action unavailable'}${target.isRevivable ? ' · Revivable' : ''}</span>
+                <span>${esc(target.statusDescription || target.statusState || 'Status unavailable')}${until > Date.now() ? ` \u00B7 until ${new Date(until).toLocaleTimeString()}` : ''}</span>
+                <span>${lastAction ? `Last action ${new Date(lastAction).toLocaleString()}` : 'Last action unavailable'}${target.isRevivable ? ' \u00B7 Revivable' : ''}</span>
               </div>
               <div class="war-target-actions">
                 <a class="button primary mini" href="https://www.torn.com/loader.php?sid=attack&user2ID=${Number(target.tornId)}" target="_blank" rel="noopener">Attack</a>
@@ -1820,8 +1821,8 @@
       <div class="war-feed">
         ${recent.length ? recent.map(attack => `
           <div class="war-attack ${resultClass(attack.result)}">
-            <div><b>${esc(attack.attackerName || 'Unknown attacker')}</b><span>→</span><b>${esc(attack.defenderName)}</b></div>
-            <small>${esc(attack.result)} · +${Number(attack.respectGain || 0).toFixed(2)} respect · ${new Date(attack.endedAt).toLocaleString()}</small>
+            <div><b>${esc(attack.attackerName || 'Unknown attacker')}</b><span>\u2192</span><b>${esc(attack.defenderName)}</b></div>
+            <small>${esc(attack.result)} \u00B7 +${Number(attack.respectGain || 0).toFixed(2)} respect \u00B7 ${new Date(attack.endedAt).toLocaleString()}</small>
           </div>`).join('') : '<div class="empty">No ranked-war attacks have been recorded.</div>'}
       </div>`;
   }
@@ -1835,16 +1836,16 @@
     if (!snapshot?.war || !snapshot?.plan) return '';
     const status = snapshot.plan.status === 'FINALIZED' ? 'FINALIZED' : 'DRAFT';
     return [
-      `Vault 111 Ranked War Payouts · War #${snapshot.war.id}`,
+      `Vault 111 Ranked War Payouts \u00B7 War #${snapshot.war.id}`,
       `${snapshot.war.factionName} vs ${snapshot.war.opponentName}`,
-      `Status: ${status} · Pool: ${formatMoney(snapshot.plan.poolAmount)} · Total: ${formatMoney(snapshot.plan.finalTotal)}`,
-      'Points: ranked-war hit 1 · out-of-war chain hit 0.5 · out-of-war non-chain hit 0.25',
+      `Status: ${status} \u00B7 Pool: ${formatMoney(snapshot.plan.poolAmount)} \u00B7 Total: ${formatMoney(snapshot.plan.finalTotal)}`,
+      'Points: ranked-war hit 1 \u00B7 out-of-war chain hit 0.5 \u00B7 out-of-war non-chain hit 0.25',
       '',
       ...(snapshot.rows || []).map((row, index) =>
-        `${index + 1}. ${row.name} [${row.tornId}] — ${formatMoney(row.finalAmount)} ` +
+        `${index + 1}. ${row.name} [${row.tornId}] \u2014 ${formatMoney(row.finalAmount)} ` +
         `(${Number(row.points || 0).toFixed(2)} points: ${row.warHits} war, ${row.chainHits} chain OOW, ${row.outsideChainHits} non-chain OOW` +
         `${Number(row.adjustmentAmount || 0) ? `, adjustment ${Number(row.adjustmentAmount) > 0 ? '+' : ''}${formatMoney(row.adjustmentAmount).replace('$-', '-$')}` : ''})` +
-        `${row.adjustmentNote ? ` — ${row.adjustmentNote}` : ''}`
+        `${row.adjustmentNote ? ` \u2014 ${row.adjustmentNote}` : ''}`
       )
     ].join('\n');
   }
@@ -1886,7 +1887,7 @@
       Number(row.adjustmentAmount || 0) !== 0
     );
     const finalizedBy = plan?.finalizedBy?.name
-      ? `${plan.finalizedBy.name}${plan.finalizedAt ? ` · ${new Date(plan.finalizedAt).toLocaleString()}` : ''}`
+      ? `${plan.finalizedBy.name}${plan.finalizedAt ? ` \u00B7 ${new Date(plan.finalizedAt).toLocaleString()}` : ''}`
       : '';
 
     const configuration = canManage && !finalized
@@ -1895,7 +1896,7 @@
           <label>Total payout pool
             <input id="v111-payout-pool" name="poolAmount" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="16" value="${esc(plan?.poolAmount || '0')}" required>
           </label>
-          <div class="payout-fixed-rules"><b>Fixed point rules</b><span>War hit 1 · OOW chain hit 0.5 · OOW non-chain hit 0.25</span></div>
+          <div class="payout-fixed-rules"><b>Fixed point rules</b><span>War hit 1 \u00B7 OOW chain hit 0.5 \u00B7 OOW non-chain hit 0.25</span></div>
           <button class="primary" type="submit"${busyAttributes()}>${plan ? 'Save & Recalculate' : 'Create Payout Draft'}</button>
         </form>`
       : plan
@@ -1912,7 +1913,7 @@
         <div>
           <span class="eyebrow">Ranked War #${Number(war.id)}</span>
           <h3>${esc(war.factionName)} <span>vs</span> ${esc(war.opponentName)}</h3>
-          <small>${esc(war.status)} · War data synchronized ${new Date(war.syncedAt).toLocaleString()}</small>
+          <small>${esc(war.status)} \u00B7 War data synchronized ${new Date(war.syncedAt).toLocaleString()}</small>
         </div>
         <span class="payout-state ${finalized ? 'finalized' : 'draft'}">${finalized ? 'Finalized & locked' : plan ? 'Draft' : 'Not configured'}</span>
       </section>
@@ -1940,9 +1941,9 @@
             <article class="payout-row" role="row">
               <span class="payout-member">
                 <a href="https://www.torn.com/profiles.php?XID=${Number(row.tornId)}" target="_blank" rel="noopener">${esc(row.name)} [${Number(row.tornId)}]</a>
-                <small>${esc(row.position || 'Member')} · ${(Number(row.share || 0) * 100).toFixed(2)}% share</small>
+                <small>${esc(row.position || 'Member')} \u00B7 ${(Number(row.share || 0) * 100).toFixed(2)}% share</small>
               </span>
-              <span class="payout-activity"><b>${Number(row.points || 0).toFixed(2)} points</b><small>${formatNumber(row.warHits)} war · ${formatNumber(row.chainHits)} OOW chain · ${formatNumber(row.outsideChainHits)} OOW non-chain</small></span>
+              <span class="payout-activity"><b>${Number(row.points || 0).toFixed(2)} points</b><small>${formatNumber(row.warHits)} war \u00B7 ${formatNumber(row.chainHits)} OOW chain \u00B7 ${formatNumber(row.outsideChainHits)} OOW non-chain</small></span>
               <strong class="payout-base" data-label="Base">${formatMoney(row.baseAmount)}</strong>
               <span class="payout-adjustment">
                 ${canManage && !finalized ? `
@@ -1993,7 +1994,7 @@
             <div><dt>Control Center role</dt><dd>${esc(user.role)}</dd></div>
             <div><dt>Faction position</dt><dd>${esc(user.factionPosition || 'Member')}</dd></div>
             <div><dt>Shared data</dt><dd>${esc(lastSync)}</dd></div>
-            <div><dt>Snapshot</dt><dd>${Number(sync?.memberCount || 0)} members · ${Number(sync?.crimeCount || 0)} crimes</dd></div>
+            <div><dt>Snapshot</dt><dd>${Number(sync?.memberCount || 0)} members \u00B7 ${Number(sync?.crimeCount || 0)} crimes</dd></div>
             <div><dt>My crime stats</dt><dd>${esc(personalStats)}</dd></div>
             <div><dt>Battle & drug analytics</dt><dd>${esc(analyticsStatus)}</dd></div>
           </dl>
@@ -2263,7 +2264,7 @@
       group?.classList.toggle('is-open', state.settings.planningOpen);
       button.setAttribute('aria-expanded', String(state.settings.planningOpen));
       if (content) content.hidden = !state.settings.planningOpen;
-      if (icon) icon.textContent = state.settings.planningOpen ? '⌃' : '⌄';
+      if (icon) icon.textContent = state.settings.planningOpen ? '\u2303' : '\u2304';
     });
     root.querySelector('#v111-backend-form')?.addEventListener('submit', connectBackend);
     root.querySelector('[data-act="backend-logout"]')?.addEventListener('click', disconnectBackend);
@@ -2723,14 +2724,14 @@
   function roleReason(member, role) {
     const entries = Object.entries(member.totals || {}).filter(([k]) => k !== 'crimes').sort((a, b) => b[1] - a[1]);
     const best = entries[0];
-    return `${best ? `Strongest tracked category: ${best[0]} (${formatNumber(best[1])}). ` : ''}Weighted for the “${role}” role.`;
+    return `${best ? `Strongest tracked category: ${best[0]} (${formatNumber(best[1])}). ` : ''}Weighted for the \u201C${role}\u201D role.`;
   }
 
   async function copyPlan() {
     const plans = buildPlan(state.cache.members || [], state.cache.crimes || []);
     const text = plans.map(c => [
       `${c.name} (Difficulty ${c.difficulty || '?'})`,
-      ...c.slots.map(s => `• ${s.role}: ${s.assigned ? `${s.assigned.name} [${s.assigned.id}]` : 'UNFILLED'}`),
+      ...c.slots.map(s => `\u2022 ${s.role}: ${s.assigned ? `${s.assigned.name} [${s.assigned.id}]` : 'UNFILLED'}`),
       CRIME_URL
     ].join('\n')).join('\n\n');
     if (!text) return setStatus(root.querySelector('#v111-status'), 'There is no plan to copy yet.', true);
@@ -2887,28 +2888,75 @@
 
   function backendRequest(method, route, { body, token, timeoutMs = 15000 } = {}) {
     return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method,
-        url: `${validatedBackendBase()}${route}`,
-        headers: {
-          Accept: 'application/json',
-          ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        data: body !== undefined ? JSON.stringify(body) : undefined,
-        timeout: timeoutMs,
-        onload: response => {
-          let data = null;
-          try { data = response.responseText ? JSON.parse(response.responseText) : null; }
-          catch { return reject(new Error('The Vault 111 backend returned an unreadable response.')); }
-          if (response.status >= 200 && response.status < 300) return resolve(data);
-          const error = new Error(data?.error || `Vault 111 backend error ${response.status}`);
-          error.status = response.status;
-          error.data = data;
-          reject(error);
-        },
-        onerror: () => reject(new Error('Could not reach the Vault 111 backend.')),
-        ontimeout: () => reject(new Error('The Vault 111 backend request timed out.'))
+      const requestMethod = String(method || 'GET').toUpperCase();
+      const url = `${validatedBackendBase()}${route}`;
+      const headers = {
+        Accept: 'application/json',
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+      const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
+      const onload = response => {
+        let data = null;
+        try { data = response.responseText ? JSON.parse(response.responseText) : null; }
+        catch { return reject(new Error('The Vault 111 backend returned an unreadable response.')); }
+        if (response.status >= 200 && response.status < 300) return resolve(data);
+        const error = new Error(data?.error || `Vault 111 backend error ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        reject(error);
+      };
+
+      if (typeof GM_xmlhttpRequest === 'function') {
+        try {
+          GM_xmlhttpRequest({
+            method: requestMethod,
+            url,
+            headers,
+            data: requestBody,
+            timeout: timeoutMs,
+            onload,
+            onerror: () => reject(new Error('Could not reach the Vault 111 backend.')),
+            ontimeout: () => reject(new Error('The Vault 111 backend request timed out.'))
+          });
+        } catch (error) {
+          reject(new Error(`Could not start the Vault 111 backend request: ${friendly(error)}`));
+        }
+        return;
+      }
+
+      const pdaFunctions = {
+        GET: window.PDA_httpGet,
+        POST: window.PDA_httpPost,
+        PUT: window.PDA_httpPut,
+        DELETE: window.PDA_httpDelete,
+        PATCH: window.PDA_httpPatch
+      };
+      const pdaRequest = pdaFunctions[requestMethod];
+      if (typeof pdaRequest !== 'function') {
+        reject(new Error('This userscript manager does not provide secure cross-origin requests. In Torn PDA, update the app and set the script injection time to END.'));
+        return;
+      }
+
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('The Vault 111 backend request timed out.'));
+      }, timeoutMs);
+      const args = requestMethod === 'GET' || requestMethod === 'DELETE'
+        ? [url, headers]
+        : [url, headers, requestBody || ''];
+      Promise.resolve(pdaRequest(...args)).then(response => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        onload(response);
+      }).catch(error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        reject(new Error(`Could not reach the Vault 111 backend through Torn PDA: ${friendly(error)}`));
       });
     });
   }
@@ -2919,7 +2967,7 @@
 
     const previousLabel = state.ui.busyLabel;
     if (state.backend.loading) {
-      state.ui.busyLabel = 'Waking the secure backend… This can take about a minute on free hosting.';
+      state.ui.busyLabel = 'Waking the secure backend\u2026 This can take about a minute on free hosting.';
       render();
     }
 
@@ -3043,7 +3091,7 @@
     }
     state.backend.error = '';
     state.ui.backendStatus = null;
-    if (!beginBackendWork('Connecting securely…', 'backend')) return;
+    if (!beginBackendWork('Connecting securely\u2026', 'backend')) return;
     let sessionEstablished = false;
     let warning = '';
     try {
@@ -3103,7 +3151,7 @@
 
   async function restoreBackendSession() {
     if (!load(STORE.backendRefresh, '')) return;
-    if (!beginBackendWork('Restoring secure session…', state.ui.activeTab)) return;
+    if (!beginBackendWork('Restoring secure session\u2026', state.ui.activeTab)) return;
     try {
       const result = await backendApi('GET', '/v1/me');
       state.backend.connected = true;
@@ -3195,7 +3243,7 @@
 
   async function refreshDashboard(silent = false) {
     if (state.backend.loading || !state.backend.connected) return;
-    if (!beginBackendWork('Refreshing the unified faction dashboard…', 'dashboard', !silent)) return;
+    if (!beginBackendWork('Refreshing the unified faction dashboard\u2026', 'dashboard', !silent)) return;
     try {
       await Promise.all([
         loadDashboardSnapshot(),
@@ -3213,7 +3261,7 @@
 
   async function refreshSchedule(silent = false, returnTab = 'schedule') {
     if (state.backend.loading || !state.backend.connected) return;
-    if (!beginBackendWork('Refreshing the shared faction schedule…', returnTab, !silent)) return;
+    if (!beginBackendWork('Refreshing the shared faction schedule\u2026', returnTab, !silent)) return;
     try {
       const snapshot = await loadScheduleSnapshot();
       if (!silent) {
@@ -3263,7 +3311,7 @@
       setStatus(root.querySelector('#v111-schedule-status'), state.ui.scheduleStatus.text, true);
       return;
     }
-    if (!beginBackendWork(id ? 'Saving scheduled event…' : 'Creating scheduled event…', 'schedule', false)) return;
+    if (!beginBackendWork(id ? 'Saving scheduled event\u2026' : 'Creating scheduled event\u2026', 'schedule', false)) return;
     try {
       const payload = {
         type,
@@ -3300,7 +3348,7 @@
     const expectedVersion = Number(button.dataset.eventVersion || 0);
     if (!id || !expectedVersion) return;
     if (!window.confirm('Delete this scheduled faction event? This cannot be undone.')) return;
-    if (!beginBackendWork('Deleting scheduled event…', 'schedule')) return;
+    if (!beginBackendWork('Deleting scheduled event\u2026', 'schedule')) return;
     try {
       await backendApi(
         'DELETE',
@@ -3346,7 +3394,7 @@
       setStatus(root.querySelector('#v111-schedule-status'), state.ui.scheduleStatus.text, true);
       return;
     }
-    if (!beginBackendWork('Saving your notification preferences…', 'schedule', false)) return;
+    if (!beginBackendWork('Saving your notification preferences\u2026', 'schedule', false)) return;
     try {
       await backendApi('PUT', '/v1/me/notification-preferences', {
         enabled,
@@ -3398,12 +3446,12 @@
       log[key] = now;
       changed = true;
       const timing = eventCountdown(event.startsAt);
-      const message = `${event.title} — ${timing}`;
+      const message = `${event.title} \u2014 ${timing}`;
       showScheduleToast(message);
       if (preference.browserNotifications && typeof GM_notification === 'function') {
         try {
           GM_notification({
-            title: `Vault 111 · ${scheduleEventLabel(event.type)}`,
+            title: `Vault 111 \u00B7 ${scheduleEventLabel(event.type)}`,
             text: message,
             timeout: 12000,
             onclick: () => window.focus()
@@ -3452,7 +3500,7 @@
   async function refreshAdmin(silent = false) {
     if (state.backend.loading || !state.backend.connected || !backendCanAdminRead()) return;
     state.ui.adminStatus = null;
-    if (!beginBackendWork('Refreshing protected administration data…', 'admin', !silent)) return;
+    if (!beginBackendWork('Refreshing protected administration data\u2026', 'admin', !silent)) return;
     try {
       const snapshot = await loadAdminSnapshot();
       if (!silent) {
@@ -3478,7 +3526,7 @@
     const expectedVersion = Number(button.dataset.mappingVersion || 0);
     if (!factionPosition || !appRole) return;
     if (!window.confirm(`Map "${factionPosition}" to ${adminRoleLabel(appRole)}? Affected users will be signed out so the new role takes effect immediately.`)) return;
-    if (!beginBackendWork('Saving faction position permissions…', 'admin')) return;
+    if (!beginBackendWork('Saving faction position permissions\u2026', 'admin')) return;
     try {
       const result = await backendApi(
         'PUT',
@@ -3509,7 +3557,7 @@
     const expectedVersion = Number(button.dataset.mappingVersion || 0);
     if (!factionPosition || !expectedVersion) return;
     if (!window.confirm(`Remove the mapping for "${factionPosition}"? Affected users will become read-only Members and must reconnect.`)) return;
-    if (!beginBackendWork('Removing faction position permissions…', 'admin')) return;
+    if (!beginBackendWork('Removing faction position permissions\u2026', 'admin')) return;
     try {
       const result = await backendApi(
         'DELETE',
@@ -3536,9 +3584,9 @@
     const expectedVersion = Number(button.dataset.adminUserVersion || 0);
     const suspended = button.dataset.adminSuspend === 'true';
     if (!userId || !expectedVersion) return;
-    const label = suspended ? 'Suspend this member’s Control Center access and revoke every session?' : 'Restore this member’s Control Center access? They will still need to reconnect.';
+    const label = suspended ? 'Suspend this member\u2019s Control Center access and revoke every session?' : 'Restore this member\u2019s Control Center access? They will still need to reconnect.';
     if (!window.confirm(label)) return;
-    if (!beginBackendWork(suspended ? 'Suspending Control Center access…' : 'Restoring Control Center access…', 'admin')) return;
+    if (!beginBackendWork(suspended ? 'Suspending Control Center access\u2026' : 'Restoring Control Center access\u2026', 'admin')) return;
     try {
       const result = await backendApi(
         'PUT',
@@ -3565,8 +3613,8 @@
     const userId = button.dataset.adminUserId || '';
     const expectedVersion = Number(button.dataset.adminUserVersion || 0);
     if (!userId || !expectedVersion) return;
-    if (!window.confirm('Revoke all of this member’s Control Center sessions? They will need to connect their own API key again.')) return;
-    if (!beginBackendWork('Revoking member sessions…', 'admin')) return;
+    if (!window.confirm('Revoke all of this member\u2019s Control Center sessions? They will need to connect their own API key again.')) return;
+    if (!beginBackendWork('Revoking member sessions\u2026', 'admin')) return;
     try {
       const result = await backendApi(
         'POST',
@@ -3617,7 +3665,7 @@
       }
       expiresAt = expiration.toISOString();
     }
-    if (!beginBackendWork(id ? 'Saving announcement changes…' : 'Publishing faction announcement…', 'dashboard', false)) return;
+    if (!beginBackendWork(id ? 'Saving announcement changes\u2026' : 'Publishing faction announcement\u2026', 'dashboard', false)) return;
     try {
       const payload = { title, body, pinned, expiresAt };
       if (id) {
@@ -3648,7 +3696,7 @@
     const expectedVersion = Number(button.dataset.announcementVersion || 0);
     if (!id || !expectedVersion) return;
     if (!window.confirm('Delete this faction announcement? This cannot be undone.')) return;
-    if (!beginBackendWork('Deleting faction announcement…', 'dashboard')) return;
+    if (!beginBackendWork('Deleting faction announcement\u2026', 'dashboard')) return;
     try {
       await backendApi(
         'DELETE',
@@ -3699,7 +3747,7 @@
   async function refreshPayouts(silent = false) {
     if (state.backend.loading || !state.backend.connected) return;
     state.ui.payoutStatus = null;
-    if (!beginBackendWork('Refreshing shared ranked-war payouts…', 'payouts', !silent)) return;
+    if (!beginBackendWork('Refreshing shared ranked-war payouts\u2026', 'payouts', !silent)) return;
     try {
       const result = await loadPayoutSnapshot();
       await loadDashboardSnapshot();
@@ -3739,7 +3787,7 @@
     if (!warId) return;
     try {
       const poolAmount = normalizedMoneyInput(root.querySelector('#v111-payout-pool')?.value);
-      if (!beginBackendWork('Saving payout settings and recalculating…', 'payouts')) return;
+      if (!beginBackendWork('Saving payout settings and recalculating\u2026', 'payouts')) return;
       state.backend.payoutSnapshot = await backendApi('PUT', `/v1/war/${encodeURIComponent(warId)}/payout`, {
         poolAmount,
         expectedVersion: Number(snapshot.plan?.version || 0)
@@ -3771,7 +3819,7 @@
       const amount = normalizedMoneyInput(amountInput.value, true);
       const note = noteInput.value.trim();
       if (note.length > 200) throw new Error('Adjustment notes are limited to 200 characters.');
-      if (!beginBackendWork(`Saving payout adjustment for member ${memberId}…`, 'payouts')) return;
+      if (!beginBackendWork(`Saving payout adjustment for member ${memberId}\u2026`, 'payouts')) return;
       state.backend.payoutSnapshot = await backendApi(
         'PUT',
         `/v1/war/${encodeURIComponent(warId)}/payout/members/${encodeURIComponent(memberId)}`,
@@ -3798,7 +3846,7 @@
     const snapshot = state.backend.payoutSnapshot;
     if (state.backend.loading || !backendCanPayoutManage() || !snapshot?.plan) return;
     if (!window.confirm('Finalize and lock this payout report? Future Torn synchronizations will not change the stored member amounts.')) return;
-    if (!beginBackendWork('Finalizing and locking payout report…', 'payouts')) return;
+    if (!beginBackendWork('Finalizing and locking payout report\u2026', 'payouts')) return;
     try {
       state.backend.payoutSnapshot = await backendApi(
         'POST',
@@ -3823,7 +3871,7 @@
     const snapshot = state.backend.payoutSnapshot;
     if (state.backend.loading || !backendCanPayoutReopen() || !snapshot?.plan) return;
     if (!window.confirm('Reopen this finalized payout report? Its locked snapshot will become a recalculating draft again.')) return;
-    if (!beginBackendWork('Reopening payout draft…', 'payouts')) return;
+    if (!beginBackendWork('Reopening payout draft\u2026', 'payouts')) return;
     try {
       state.backend.payoutSnapshot = await backendApi(
         'POST',
@@ -3897,7 +3945,7 @@
   async function refreshWarTracker(silent = false) {
     if (state.backend.loading || !state.backend.connected) return;
     state.ui.warStatus = null;
-    if (!beginBackendWork('Refreshing shared ranked-war data…', 'war', !silent)) return;
+    if (!beginBackendWork('Refreshing shared ranked-war data\u2026', 'war', !silent)) return;
     try {
       const result = await loadWarSnapshot();
       await loadDashboardSnapshot();
@@ -3925,7 +3973,7 @@
       return;
     }
     state.ui.warStatus = null;
-    if (!beginBackendWork('Synchronizing ranked-war scores, targets, and attacks from Torn…', 'war')) return;
+    if (!beginBackendWork('Synchronizing ranked-war scores, targets, and attacks from Torn\u2026', 'war')) return;
     try {
       const sync = await backendApi('POST', '/v1/war/sync', {}, { timeoutMs: 45000 });
       const result = await loadWarSnapshot();
@@ -3968,7 +4016,7 @@
       return;
     }
     state.ui.warStatus = null;
-    if (!beginBackendWork(`Saving note for target ${targetId}…`, 'war')) return;
+    if (!beginBackendWork(`Saving note for target ${targetId}\u2026`, 'war')) return;
     try {
       await backendApi(
         'PUT',
@@ -3992,7 +4040,7 @@
   async function syncBackendFaction(silent = false, returnToBackend = false, plannerAutomatic = false) {
     if (state.backend.loading) return;
     const returnTab = returnToBackend ? 'backend' : state.ui.activeTab;
-    const label = backendCanSync() ? 'Synchronizing Vault 111 from Torn…' : 'Refreshing shared faction data…';
+    const label = backendCanSync() ? 'Synchronizing Vault 111 from Torn\u2026' : 'Refreshing shared faction data\u2026';
     state.backend.error = '';
     state.ui.backendStatus = null;
     if (!beginBackendWork(label, returnTab, !silent)) return;
@@ -4030,7 +4078,7 @@
     if (!state.backend.connected || (automatic && !personalStatsAutoSyncDue())) return;
     state.backend.error = '';
     state.ui.backendStatus = null;
-    if (!beginBackendWork('Synchronizing your crime, battle, and drug stats…', 'backend')) return;
+    if (!beginBackendWork('Synchronizing your crime, battle, and drug stats\u2026', 'backend')) return;
     try {
       const synced = await syncOwnMemberData(!automatic);
       await loadSharedPlan();
@@ -4054,7 +4102,7 @@
   async function refreshMemberOverview(silent = false) {
     if (state.backend.loading || !state.backend.connected) return;
     state.ui.memberStatus = null;
-    if (!beginBackendWork('Refreshing the faction member overview…', 'members', !silent)) return;
+    if (!beginBackendWork('Refreshing the faction member overview\u2026', 'members', !silent)) return;
     try {
       const result = await loadMemberOverview();
       if (!silent) {
@@ -4077,7 +4125,7 @@
       return;
     }
     state.ui.memberStatus = null;
-    if (!beginBackendWork('Synchronizing your battle stats, drug totals, and cooldown…', 'members')) return;
+    if (!beginBackendWork('Synchronizing your battle stats, drug totals, and cooldown\u2026', 'members')) return;
     try {
       const result = await syncOwnMemberData(true);
       await loadMemberOverview();
@@ -4096,7 +4144,7 @@
   async function enableMemberAnalytics() {
     if (state.backend.loading || !state.backend.connected) return;
     if (!window.confirm('Enable storage of your exact battle stats, drug totals, rehabilitation totals, overdoses, and drug cooldown? Exact values will be visible only to you, the Vault 111 Owner, and Administrators.')) return;
-    if (!beginBackendWork('Enabling and synchronizing member analytics…', 'backend')) return;
+    if (!beginBackendWork('Enabling and synchronizing member analytics\u2026', 'backend')) return;
     try {
       const consent = await backendApi('PUT', '/v1/me/analytics-consent', { accepted: true });
       state.backend.user.analyticsConsentAt = consent.analyticsConsentAt;
@@ -4117,7 +4165,7 @@
   async function disableMemberAnalytics() {
     if (state.backend.loading || !state.backend.connected) return;
     if (!window.confirm('Disable analytics tracking and permanently delete your stored battle-stat and drug history from the Control Center?')) return;
-    if (!beginBackendWork('Deleting your stored member analytics…', 'backend')) return;
+    if (!beginBackendWork('Deleting your stored member analytics\u2026', 'backend')) return;
     try {
       await backendApi('PUT', '/v1/me/analytics-consent', { accepted: false });
       state.backend.user.analyticsConsentAt = null;
@@ -4138,7 +4186,7 @@
     if (state.backend.loading) return;
     state.backend.error = '';
     state.ui.backendStatus = null;
-    if (!beginBackendWork('Refreshing shared planner data…', 'backend')) return;
+    if (!beginBackendWork('Refreshing shared planner data\u2026', 'backend')) return;
     try {
       const result = await loadSharedPlan();
       await loadDashboardSnapshot();
@@ -4166,7 +4214,7 @@
     save(STORE.overrides, state.overrides);
     state.backend.error = '';
     state.ui.backendStatus = null;
-    if (!beginBackendWork('Saving shared assignment…', 'plan')) return;
+    if (!beginBackendWork('Saving shared assignment\u2026', 'plan')) return;
     try {
       if (state.backend.connected) await saveSharedAssignment(select.dataset.crimeId, key, selectedId);
       state.backend.error = '';
@@ -4196,7 +4244,7 @@
   }
 
   async function disconnectBackend() {
-    if (!beginBackendWork('Disconnecting securely…', 'backend')) return;
+    if (!beginBackendWork('Disconnecting securely\u2026', 'backend')) return;
     const refreshToken = load(STORE.backendRefresh, '');
     try {
       if (refreshToken) await backendRequest('POST', '/v1/auth/logout', { body: { refreshToken } });
@@ -4928,4 +4976,12 @@
     style.id = 'v111-control-center-styles';
     style.textContent = css;
     (document.head || document.documentElement).appendChild(style);
-  }})();
+  }
+  }
+
+  if (document.readyState === 'loading' || !document.documentElement) {
+    document.addEventListener('DOMContentLoaded', startControlCenter, { once: true });
+  } else {
+    startControlCenter();
+  }
+})();
