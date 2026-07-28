@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vault 111 Control Center
 // @namespace    https://www.torn.com/
-// @version      3.6.0-alpha.6
+// @version      3.6.0-alpha.7
 // @description  Vault 111 administration, scheduling, dashboard, OC planning, war tracking, payouts, and member analytics.
 // @author       Vault 111
 // @downloadURL  https://raw.githubusercontent.com/Zabok08/Vault-111/main/Vault-111-Control-Center.user.js
@@ -23,7 +23,7 @@
   'use strict';
 
   function startControlCenter() {
-  const CLIENT_VERSION = '3.6.0-alpha.6';
+  const CLIENT_VERSION = '3.6.0-alpha.7';
   const INSTANCE_MARKER_ID = 'v111-control-center-singleton';
   const existingMarker = document.getElementById(INSTANCE_MARKER_ID);
   const existingPanel = document.getElementById('v111-ocp');
@@ -306,12 +306,20 @@
     if (!root?.isConnected) return;
     const viewport = window.visualViewport;
     const height = Math.max(1, Number(viewport?.height || window.innerHeight || 1));
+    const width = Math.max(1, Number(viewport?.width || window.innerWidth || 1));
     const offsetTop = Math.max(0, Number(viewport?.offsetTop || 0));
     const mobile = usesMobileLayout();
     if (!mobile) {
       stableMobileViewportHeight = height;
       root.classList.remove('keyboard-open');
-      for (const property of ['--v111-mobile-panel-height', '--v111-mobile-panel-top', '--v111-visual-height']) {
+      for (const property of [
+        '--v111-mobile-panel-height',
+        '--v111-mobile-panel-top',
+        '--v111-mobile-modal-height',
+        '--v111-mobile-modal-top',
+        '--v111-mobile-modal-width',
+        '--v111-visual-height'
+      ]) {
         root.style.removeProperty(property);
       }
       if (state.settings.collapsed) applyCollapsedPosition();
@@ -332,10 +340,17 @@
     const restingPanelHeight = Math.max(220, Math.min(420, stableMobileViewportHeight * 0.4));
     const visiblePanelHeight = Math.min(restingPanelHeight, Math.max(180, height - 12));
     const top = offsetTop + Math.max(6, (height - visiblePanelHeight) / 2);
+    const restingModalHeight = Math.max(240, Math.min(520, stableMobileViewportHeight * 0.58));
+    const visibleModalHeight = Math.min(restingModalHeight, Math.max(180, height - 16));
+    const modalTop = offsetTop + Math.max(8, (height - visibleModalHeight) / 2);
+    const visibleModalWidth = Math.max(1, Math.min(340, width - 20));
 
     root.classList.toggle('keyboard-open', keyboardOpen);
     root.style.setProperty('--v111-mobile-panel-height', `${Math.round(visiblePanelHeight)}px`);
     root.style.setProperty('--v111-mobile-panel-top', `${Math.round(top)}px`);
+    root.style.setProperty('--v111-mobile-modal-height', `${Math.round(visibleModalHeight)}px`);
+    root.style.setProperty('--v111-mobile-modal-top', `${Math.round(modalTop)}px`);
+    root.style.setProperty('--v111-mobile-modal-width', `${Math.round(visibleModalWidth)}px`);
     root.style.setProperty('--v111-visual-height', `${Math.round(height)}px`);
     if (state.settings.collapsed) applyCollapsedPosition();
   }
@@ -425,7 +440,7 @@
       <header data-drag-handle${state.settings.collapsed ? ' tabindex="0" aria-label="Collapsed planner. Drag or use arrow keys to move."' : ''}>
         <div>
           <strong>Vault 111 Control Center</strong>
-          <small>v3.6 alpha.6 \u00B7 ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> \u00B7 ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
+          <small>v3.6 alpha.7 \u00B7 ${state.backend.connected ? '<b class="backend-label">BACKEND CONNECTED</b> \u00B7 ' : ''}${syncedAt ? `Synced ${new Date(syncedAt).toLocaleString()}` : 'Not synced'}</small>
         </div>
         <div class="head-actions">
           <button data-act="collapse" aria-label="${state.settings.collapsed ? 'Expand planner' : 'Collapse planner'}" aria-expanded="${!state.settings.collapsed}" aria-controls="v111-body" title="${state.settings.collapsed ? 'Expand' : 'Collapse'}">${state.settings.collapsed ? '\u25A3' : '\u2014'}</button>
@@ -1455,6 +1470,7 @@
             : 'This member has not enabled battle-stat and drug tracking.'}</p>`;
     const modal = root.querySelector('#v111-modal');
     modal.hidden = false;
+    syncMobileViewport();
     modal.innerHTML = `<div class="modal-backdrop" data-close-modal aria-hidden="true"></div><article class="member-modal" role="dialog" aria-modal="true" aria-labelledby="v111-member-modal-title" tabindex="-1">
       <div class="modal-head"><div><h3 id="v111-member-modal-title">${esc(member.name)} [${member.id}]</h3><small>${esc(member.position || 'Faction member')} \u00B7 Level ${member.level || '?'}</small></div><button data-close-modal aria-label="Close member profile" title="Close">\u00D7</button></div>
       <div class="profile-status ${member.isInOc ? 'busy' : 'free'}">${member.isInOc ? 'Currently in an OC' : 'Available for planning'}</div>
@@ -4944,7 +4960,41 @@
         #v111-ocp .member-tags { justify-content:flex-start !important; }
         #v111-ocp .queue-row { align-items:flex-start !important; }
         #v111-ocp .queue-right { align-items:flex-end !important; flex-direction:column !important; }
-        #v111-ocp .member-modal { right:3vw !important; width:min(94vw,380px) !important; max-height:var(--v111-mobile-panel-height,40vh) !important; padding:7px !important; font-size:10px !important; }
+        #v111-ocp .member-modal {
+          position:fixed !important;
+          left:50% !important;
+          right:auto !important;
+          top:var(--v111-mobile-modal-top,21vh) !important;
+          bottom:auto !important;
+          transform:translateX(-50%) !important;
+          width:var(--v111-mobile-modal-width,min(88vw,340px)) !important;
+          max-width:calc(100vw - 20px) !important;
+          height:auto !important;
+          max-height:var(--v111-mobile-modal-height,58vh) !important;
+          padding:7px !important;
+          overflow-x:hidden !important;
+          overflow-y:auto !important;
+          overscroll-behavior:contain !important;
+          -webkit-overflow-scrolling:touch !important;
+          touch-action:pan-y !important;
+          font-size:10px !important;
+        }
+        #v111-ocp .member-modal, #v111-ocp .member-modal * { min-width:0 !important; }
+        #v111-ocp .member-modal .modal-head {
+          position:sticky !important;
+          top:-7px !important;
+          z-index:5 !important;
+          margin:-7px -7px 5px !important;
+          padding:7px !important;
+          background:#111a23 !important;
+          border-bottom:1px solid #2d4b62 !important;
+        }
+        #v111-ocp .member-modal .modal-head h3 { overflow-wrap:anywhere !important; }
+        #v111-ocp .member-modal .modal-head button { flex:0 0 auto !important; }
+        #v111-ocp .member-modal .member-live-status { align-items:flex-start !important; flex-direction:column !important; gap:2px !important; }
+        #v111-ocp .member-modal .analytics-heading { align-items:flex-start !important; flex-direction:column !important; gap:2px !important; }
+        #v111-ocp .member-modal .profile-roles div, #v111-ocp .member-modal .stat-bars div { align-items:flex-start !important; flex-direction:column !important; }
+        #v111-ocp .member-modal .toolbar { grid-template-columns:1fr !important; }
         #v111-ocp .profile-status { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-analytics-section { margin:5px 0 !important; padding:5px !important; }
         #v111-ocp .member-history-section { margin:5px 0 !important; padding:5px !important; }
